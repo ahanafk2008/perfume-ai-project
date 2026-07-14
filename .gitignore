@@ -1,0 +1,19 @@
+# Environment
+.env
+.env.*
+
+# Virtual environment
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Database
+data/products.db
+*.db-journal
+
+# Debug artifacts
+tree.txt
