@@ -1,22 +1,32 @@
 import logging
-import sqlite3
-from pathlib import Path
+from collections.abc import Mapping
+from typing import Any
 
 try:
+    from .database import fetch_product_candidates
     from .filters import (
         BUDGET_KEYWORDS,
         NORMALIZATION,
         STOP_WORDS,
+        detect_brand,
+        detect_category,
+        detect_combo,
+        detect_gender,
         extract_budget,
         normalize_words,
         tokenize_query,
     )
     from .ranking import rank_products
 except ImportError:  # pragma: no cover - supports running main.py directly
+    from database import fetch_product_candidates
     from filters import (
         BUDGET_KEYWORDS,
         NORMALIZATION,
         STOP_WORDS,
+        detect_brand,
+        detect_category,
+        detect_combo,
+        detect_gender,
         extract_budget,
         normalize_words,
         tokenize_query,
@@ -25,75 +35,57 @@ except ImportError:  # pragma: no cover - supports running main.py directly
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DB = BASE_DIR / "data" / "products.db"
+
+def _deduplicate_products(
+    products: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Remove duplicate products while preserving database result order."""
+
+    unique: list[dict[str, Any]] = []
+    seen: set[Any] = set()
+
+    for product in products:
+        product_id = product.get("id")
+        identifier = product_id if product_id is not None else id(product)
+
+        if identifier in seen:
+            continue
+
+        unique.append(dict(product))
+        seen.add(identifier)
+
+    return unique
 
 
 def search_products(query: str = "") -> list[dict]:
-    """Search the product database with keyword matching and optional budget filtering."""
+    """Retrieve, rank, and return products matching the user query."""
 
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
+    tokens = tokenize_query(query)
     budget = extract_budget(query)
+    gender = detect_gender(query)
+    brand = detect_brand(query)
+    category = detect_category(query)
+    combo_requested = detect_combo(query)
 
-    words = tokenize_query(query)
+    logger.debug(
+        "Search filters: tokens=%s budget=%s gender=%s brand=%s "
+        "category=%s combo=%s",
+        tokens,
+        budget,
+        gender,
+        brand,
+        category,
+        combo_requested,
+    )
 
-    results: list[dict] = []
+    candidates = fetch_product_candidates(tokens=tokens, budget=budget)
+    unique_candidates = _deduplicate_products(candidates)
 
-    # If no keywords, return products within budget
-    if not words:
+    logger.debug("Product candidates found: %d", len(unique_candidates))
 
-        cursor.execute("SELECT * FROM products")
-
-        rows = cursor.fetchall()
-
-        for row in rows:
-
-            product = dict(row)
-
-            if budget is None or product["price"] <= budget:
-                results.append(product)
-
-    else:
-
-        for word in words:
-
-            cursor.execute("""
-                SELECT *
-                FROM products
-                WHERE LOWER(name) LIKE ?
-                   OR LOWER(brand) LIKE ?
-                   OR LOWER(category) LIKE ?
-            """, (
-                f"%{word}%",
-                f"%{word}%",
-                f"%{word}%",
-            ))
-
-            rows = cursor.fetchall()
-
-            for row in rows:
-
-                product = dict(row)
-
-                if budget is None or product["price"] <= budget:
-                    results.append(product)
-
-    conn.close()
-
-    # Remove duplicates
-    unique: list[dict] = []
-    seen: set[str] = set()
-
-    for p in results:
-        if p["id"] not in seen:
-            unique.append(p)
-            seen.add(p["id"])
-
-    logger.debug("Products found: %d", len(unique))
-    for p in unique:
-        logger.debug("- %s (৳%s)", p["name"], p["price"])
-
-    return rank_products(unique, query, tokens=words, budget=budget)
+    return rank_products(
+        unique_candidates,
+        query,
+        tokens=tokens,
+        budget=budget,
+    )

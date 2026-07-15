@@ -63,6 +63,47 @@ def fetch_products(db_path: Path = DEFAULT_DB_PATH) -> list[dict[str, Any]]:
     return execute_query("SELECT * FROM products", db_path=db_path)
 
 
+def fetch_product_candidates(
+    tokens: Sequence[str],
+    budget: int | None = None,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> list[dict[str, Any]]:
+    """Return product candidates matching any token and optional budget."""
+
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    unique_tokens = list(dict.fromkeys(token.lower() for token in tokens if token))
+
+    for token in unique_tokens:
+        like_value = f"%{token}%"
+        conditions.append(
+            """
+            (
+                LOWER(name) LIKE ?
+                OR LOWER(brand) LIKE ?
+                OR LOWER(category) LIKE ?
+            )
+            """
+        )
+        params.extend([like_value, like_value, like_value])
+
+    sql = "SELECT * FROM products"
+
+    where_clauses: list[str] = []
+    if conditions:
+        where_clauses.append(f"({' OR '.join(conditions)})")
+
+    if budget is not None:
+        where_clauses.append("price <= ?")
+        params.append(budget)
+
+    if where_clauses:
+        sql += f" WHERE {' AND '.join(where_clauses)}"
+
+    return execute_query(sql, params, db_path=db_path)
+
+
 def fetch_product_by_id(
     product_id: str,
     db_path: Path = DEFAULT_DB_PATH,
