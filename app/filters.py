@@ -6,7 +6,28 @@ from collections.abc import Iterable
 
 # Bangla, Banglish, and English normalization.
 NORMALIZATION: dict[str, str] = {
+
+    # Female relationships / gift intent
+    "wife": "female",
+    "wives": "female",
+    "girlfriend": "female",
+    "gf": "female",
+    "mother": "female",
+    "mom": "female",
+
+    # Male relationships / gift intent
+    "husband": "male",
+    "boyfriend": "male",
+    "bf": "male",
+    "father": "male",
+    "dad": "male",
+    "brother": "male",
     # Female
+    "fiancee": "female",
+    "fiancée": "female",
+    "mum": "female",
+    "sister": "female",
+    "daughter": "female",
     "female": "female",
     "women": "female",
     "woman": "female",
@@ -22,6 +43,9 @@ NORMALIZATION: dict[str, str] = {
     "নারী": "female",
 
     # Male
+    "fiance": "male",
+    "fiancé": "male",
+    "son": "male",
     "male": "male",
     "men": "male",
     "man": "male",
@@ -109,7 +133,6 @@ KNOWN_CATEGORIES: set[str] = {
     "deodorant",
     "edp",
     "edt",
-    "gift",
     "mist",
     "perfume",
     "spray",
@@ -120,7 +143,6 @@ COMBO_WORDS: set[str] = {
     "combo",
     "combos",
     "set",
-    "gift",
     "pack",
     "bundle",
     "কম্বো",
@@ -197,12 +219,18 @@ def extract_budget(query: str) -> int | None:
 
 
 def detect_gender(query: str) -> str | None:
-    """Detect requested gender from the query, if present."""
+    """Detect requested gender from normalized query."""
 
     tokens = tokenize_query(query)
+
     for token in tokens:
-        if token in {"male", "female", "unisex"}:
+        if token in {
+            "male",
+            "female",
+            "unisex",
+        }:
             return token
+
     return None
 
 

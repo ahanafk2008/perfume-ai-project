@@ -10,19 +10,48 @@ logger = logging.getLogger(__name__)
 
 try:
     from .config import DATABASE_PATH
-except ImportError:  # pragma: no cover - supports running this file directly
+except ImportError:  # pragma: no cover
     from config import DATABASE_PATH
 
 
 DEFAULT_DB_PATH = DATABASE_PATH
+
 QueryParams = Sequence[Any] | Mapping[str, Any]
 
 
-def get_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
-    """Return a SQLite connection configured for dictionary-like rows."""
+def get_connection(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> sqlite3.Connection:
+    """
+    Return a production-ready SQLite connection.
 
-    conn = sqlite3.connect(db_path)
+    Features:
+    - dictionary-like rows
+    - timeout handling
+    - WAL mode for concurrency
+    - foreign key support
+    """
+
+    db_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    conn = sqlite3.connect(
+        db_path,
+        timeout=10,
+    )
+
     conn.row_factory = sqlite3.Row
+
+    conn.execute(
+        "PRAGMA journal_mode=WAL"
+    )
+
+    conn.execute(
+        "PRAGMA foreign_keys=ON"
+    )
+
     return conn
 
 
@@ -34,9 +63,24 @@ def execute_query(
     """Execute a read query and return rows as dictionaries."""
 
     conn = get_connection(db_path)
+
     try:
-        cursor = conn.execute(sql, params)
-        return [dict(row) for row in cursor.fetchall()]
+        cursor = conn.execute(
+            sql,
+            params,
+        )
+
+        return [
+            dict(row)
+            for row in cursor.fetchall()
+        ]
+
+    except sqlite3.Error:
+        logger.exception(
+            "Database read failed"
+        )
+        raise
+
     finally:
         conn.close()
 
@@ -46,21 +90,42 @@ def execute_write(
     params: QueryParams = (),
     db_path: Path = DEFAULT_DB_PATH,
 ) -> int:
-    """Execute a write query and return the number of affected rows."""
+    """Execute a write query and return affected rows."""
 
     conn = get_connection(db_path)
+
     try:
-        cursor = conn.execute(sql, params)
+        cursor = conn.execute(
+            sql,
+            params,
+        )
+
         conn.commit()
+
         return cursor.rowcount
+
+    except sqlite3.Error:
+        conn.rollback()
+
+        logger.exception(
+            "Database write failed"
+        )
+
+        raise
+
     finally:
         conn.close()
 
 
-def fetch_products(db_path: Path = DEFAULT_DB_PATH) -> list[dict[str, Any]]:
-    """Return all products from the local product database."""
+def fetch_products(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> list[dict[str, Any]]:
+    """Return all products."""
 
-    return execute_query("SELECT * FROM products", db_path=db_path)
+    return execute_query(
+        "SELECT * FROM products",
+        db_path=db_path,
+    )
 
 
 def fetch_product_candidates(
@@ -68,81 +133,203 @@ def fetch_product_candidates(
     budget: int | None = None,
     db_path: Path = DEFAULT_DB_PATH,
 ) -> list[dict[str, Any]]:
-    """Return product candidates matching any token and optional budget."""
+    """
+    Search products by token and optional budget.
+
+    Matches:
+    - name
+    - brand
+    - category
+    - description
+    """
 
     conditions: list[str] = []
     params: list[Any] = []
 
-    unique_tokens = list(dict.fromkeys(token.lower() for token in tokens if token))
+    unique_tokens = list(
+        dict.fromkeys(
+            token.lower().strip()
+            for token in tokens
+            if token and token.strip()
+        )
+    )
+
+    # Remove gender tokens if there are other search terms.
+    search_tokens = [
+        token
+        for token in unique_tokens
+        if token not in {
+            "male",
+            "female",
+            "unisex",
+        }
+    ]
+
+    if search_tokens:
+        unique_tokens = search_tokens
+
+    # Security: prevent huge queries
+    unique_tokens = unique_tokens[:20]
 
     for token in unique_tokens:
-        like_value = f"%{token}%"
+
         conditions.append(
             """
             (
                 LOWER(name) LIKE ?
                 OR LOWER(brand) LIKE ?
                 OR LOWER(category) LIKE ?
+                OR LOWER(description) LIKE ?
             )
             """
         )
-        params.extend([like_value, like_value, like_value])
 
-    sql = "SELECT * FROM products"
+        like_value = f"%{token}%"
+
+        params.extend(
+            [
+                like_value,
+                like_value,
+                like_value,
+                like_value,
+            ]
+        )
+
+    sql = """
+    SELECT *
+    FROM products
+    """
 
     where_clauses: list[str] = []
+
     if conditions:
-        where_clauses.append(f"({' OR '.join(conditions)})")
+        where_clauses.append(
+            "("
+            + " OR ".join(conditions)
+            + ")"
+        )
 
     if budget is not None:
         where_clauses.append("price <= ?")
         params.append(budget)
 
     if where_clauses:
-        sql += f" WHERE {' AND '.join(where_clauses)}"
+        sql += (
+            " WHERE "
+            + " AND ".join(where_clauses)
+        )
 
-    return execute_query(sql, params, db_path=db_path)
+    sql += """
+    ORDER BY price ASC
+    LIMIT 50
+    """
+
+    logger.debug(
+        "Product search SQL executed with %d parameters",
+        len(params),
+    )
+
+    return execute_query(
+        sql,
+        params,
+        db_path=db_path,
+    )
 
 
 def fetch_product_by_id(
     product_id: str,
     db_path: Path = DEFAULT_DB_PATH,
 ) -> dict[str, Any] | None:
-    """Return one product by ID, or None if it does not exist."""
+    """Return one product by ID."""
 
     rows = execute_query(
-        "SELECT * FROM products WHERE id = ?",
+        """
+        SELECT *
+        FROM products
+        WHERE id = ?
+        """,
         (product_id,),
         db_path=db_path,
     )
+
     return rows[0] if rows else None
 
 
-def init_db(db_path: Path = DEFAULT_DB_PATH) -> None:
-    """Create the products table if it does not already exist."""
+def init_db(
+    db_path: Path = DEFAULT_DB_PATH,
+) -> None:
+    """
+    Initialize database and indexes.
+    """
 
     conn = get_connection(db_path)
+
     try:
-        conn.execute("""
-        CREATE TABLE IF NOT EXISTS products (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            brand TEXT,
-            price REAL,
-            original_price REAL,
-            category TEXT,
-            description TEXT,
-            image_url TEXT,
-            data TEXT
+
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS products (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                brand TEXT,
+                price REAL,
+                original_price REAL,
+                category TEXT,
+                description TEXT,
+                image_url TEXT,
+                data TEXT
+            )
+            """
         )
-        """)
+
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_products_name
+            ON products(name)
+            """
+        )
+
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_products_brand
+            ON products(brand)
+            """
+        )
+
+
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_products_category
+            ON products(category)
+            """
+        )
+
+
         conn.commit()
+
+
+    except sqlite3.Error:
+        logger.exception(
+            "Database initialization failed"
+        )
+        raise
+
+
     finally:
         conn.close()
 
-    logger.info("Database ready at %s", db_path)
+
+    logger.info(
+        "Database ready at %s",
+        db_path,
+    )
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO
+    )
+
     init_db()

@@ -8,67 +8,146 @@ try:
     from .config import OLLAMA_MODEL, TEMPERATURE
     from .language import detect_language
     from .prompt_builder import build_prompt
-except ImportError:  # pragma: no cover - supports running main.py directly
+except ImportError:  # pragma: no cover
     import conversation
     from config import OLLAMA_MODEL, TEMPERATURE
     from language import detect_language
     from prompt_builder import build_prompt
 
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_USER_ID = "cli"
+
+FALLBACK_MESSAGE = (
+    "Sorry, I am having trouble processing your request right now. "
+    "Please try again in a moment."
+)
 
 
 def ask_ai(
     question: str,
     products: list[dict],
-    history: list[dict] | None = None,
     user_id: str = DEFAULT_USER_ID,
 ) -> tuple[str, list[dict]]:
     """
-    Ask the local Ollama model a perfume-related question.
+    Send a perfume-related question to Ollama.
 
-    The history argument is kept for backward-compatible callers. Conversation
-    state is managed by app.conversation and stores only raw user/assistant
-    messages, never product context.
+    Handles:
+    - prompt creation
+    - language detection
+    - Ollama failures
+    - invalid responses
+    - conversation storage
 
     Returns:
         (assistant_reply, updated_history)
     """
 
-    logger.debug("Building prompt...")
+    if not question.strip():
+        return (
+            "Please tell me what perfume you are looking for.",
+            conversation.get_history(user_id),
+        )
 
-    prompt = build_prompt(
-        user_message=question,
-        products=products,
-        history=conversation.get_history(user_id),
-        language=detect_language(question),
+    try:
+        language = detect_language(question)
+
+        logger.debug(
+            "Building prompt | user=%s | language=%s",
+            user_id,
+            language,
+        )
+
+        prompt = build_prompt(
+            user_message=question,
+            products=products,
+            history=conversation.get_history(user_id),
+            language=language,
+        )
+
+    except Exception:
+        logger.exception("Prompt building failed")
+
+        return (
+            FALLBACK_MESSAGE,
+            conversation.get_history(user_id),
+        )
+
+
+    logger.info(
+        "Sending request to Ollama | model=%s",
+        OLLAMA_MODEL,
     )
 
-    logger.info("Sending request to Ollama...")
+    start_time = time.time()
 
-    start = time.time()
+    try:
+        response = ollama.chat(
+            model=OLLAMA_MODEL,
+            options={
+                "temperature": TEMPERATURE,
+            },
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+        )
 
-    response = ollama.chat(
-        model=OLLAMA_MODEL,
-        options={
-            "temperature": TEMPERATURE,
-        },
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
+    except Exception:
+        logger.exception("Ollama request failed")
+
+        return (
+            FALLBACK_MESSAGE,
+            conversation.get_history(user_id),
+        )
+
+
+    elapsed = time.time() - start_time
+
+    logger.info(
+        "Ollama completed | %.2fs",
+        elapsed,
     )
 
-    elapsed = time.time() - start
 
-    logger.info("Finished in %.2f seconds", elapsed)
+    assistant_reply = (
+        response
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
 
-    assistant_reply = response["message"]["content"]
 
-    conversation.add_user_message(user_id, question)
-    conversation.add_assistant_message(user_id, assistant_reply)
+    if not assistant_reply:
+        logger.warning(
+            "Ollama returned empty response"
+        )
 
-    return assistant_reply, conversation.get_history(user_id)
+        assistant_reply = FALLBACK_MESSAGE
+
+
+    try:
+        conversation.add_user_message(
+            user_id,
+            question,
+        )
+
+        conversation.add_assistant_message(
+            user_id,
+            assistant_reply,
+        )
+
+        history = conversation.get_history(user_id)
+
+    except Exception:
+        logger.exception(
+            "Conversation storage failed"
+        )
+
+        history = []
+
+
+    return assistant_reply, history
