@@ -9,10 +9,23 @@ from prompts import SYSTEM_PROMPT
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL: str = "qwen3-coder:30b"
+MAX_HISTORY_MESSAGES = 20  # 10 user + 10 assistant
 
 
-def ask_ai(question: str, products: list[dict]) -> str:
-    """Ask the local Ollama model a perfume-related question with product context."""
+def ask_ai(
+    question: str,
+    products: list[dict],
+    history: list[dict] | None = None,
+) -> tuple[str, list[dict]]:
+    """
+    Ask the local Ollama model a perfume-related question.
+
+    Returns:
+        (assistant_reply, updated_history)
+    """
+
+    if history is None:
+        history = []
 
     logger.debug("Building prompt...")
 
@@ -26,7 +39,6 @@ def ask_ai(question: str, products: list[dict]) -> str:
             f"Price: ৳{p['price']}\n"
         )
 
-        # Add available variants/sizes
         if p.get("data"):
             try:
                 data = json.loads(p["data"])
@@ -48,8 +60,7 @@ def ask_ai(question: str, products: list[dict]) -> str:
 
         product_text += "\n"
 
-    user_prompt = f"""\
-Customer question:
+    user_prompt = f"""Customer question:
 {question}
 
 Available products:
@@ -60,29 +71,55 @@ Available products:
         "Prompt length: %d characters",
         len(SYSTEM_PROMPT) + len(user_prompt),
     )
+
     logger.info("Sending request to Ollama...")
+
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT,
+        }
+    ]
+
+    messages.extend(history)
+
+    messages.append(
+        {
+            "role": "user",
+            "content": user_prompt,
+        }
+    )
 
     start = time.time()
 
     response = ollama.chat(
         model=DEFAULT_MODEL,
         options={
-            "temperature": 0.2
+            "temperature": 0.2,
         },
-        messages=[
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
-        ],
+        messages=messages,
     )
 
     elapsed = time.time() - start
 
     logger.info("Finished in %.2f seconds", elapsed)
 
-    return response["message"]["content"]
+    assistant_reply = response["message"]["content"]
+
+    history.append(
+        {
+            "role": "user",
+            "content": user_prompt,
+        }
+    )
+
+    history.append(
+        {
+            "role": "assistant",
+            "content": assistant_reply,
+        }
+    )
+
+    history = history[-MAX_HISTORY_MESSAGES:]
+
+    return assistant_reply, history

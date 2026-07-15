@@ -10,6 +10,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+history = []
+
 while True:
     try:
         user = input("You: ").strip()
@@ -29,7 +31,7 @@ while True:
                 f"{p['name']} | {p['brand']} | {p['category']} | ৳{p['price']}"
             )
 
-        reply = ask_ai(user, products)
+        reply, history = ask_ai(user, products, history)
 
         print("\nAI:\n", reply)
 
