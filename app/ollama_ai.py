@@ -4,28 +4,36 @@ import time
 
 import ollama
 
-from prompts import SYSTEM_PROMPT
+try:
+    from . import conversation
+    from .config import OLLAMA_MODEL, TEMPERATURE
+    from .prompts import SYSTEM_PROMPT
+except ImportError:  # pragma: no cover - supports running main.py directly
+    import conversation
+    from config import OLLAMA_MODEL, TEMPERATURE
+    from prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL: str = "qwen3-coder:30b"
-MAX_HISTORY_MESSAGES = 20  # 10 user + 10 assistant
+DEFAULT_USER_ID = "cli"
 
 
 def ask_ai(
     question: str,
     products: list[dict],
     history: list[dict] | None = None,
+    user_id: str = DEFAULT_USER_ID,
 ) -> tuple[str, list[dict]]:
     """
     Ask the local Ollama model a perfume-related question.
 
+    The history argument is kept for backward-compatible callers. Conversation
+    state is managed by app.conversation and stores only raw user/assistant
+    messages, never product context.
+
     Returns:
         (assistant_reply, updated_history)
     """
-
-    if history is None:
-        history = []
 
     logger.debug("Building prompt...")
 
@@ -81,7 +89,7 @@ Available products:
         }
     ]
 
-    messages.extend(history)
+    messages.extend(conversation.get_history(user_id))
 
     messages.append(
         {
@@ -93,9 +101,9 @@ Available products:
     start = time.time()
 
     response = ollama.chat(
-        model=DEFAULT_MODEL,
+        model=OLLAMA_MODEL,
         options={
-            "temperature": 0.2,
+            "temperature": TEMPERATURE,
         },
         messages=messages,
     )
@@ -106,20 +114,7 @@ Available products:
 
     assistant_reply = response["message"]["content"]
 
-    history.append(
-        {
-            "role": "user",
-            "content": user_prompt,
-        }
-    )
+    conversation.add_user_message(user_id, question)
+    conversation.add_assistant_message(user_id, assistant_reply)
 
-    history.append(
-        {
-            "role": "assistant",
-            "content": assistant_reply,
-        }
-    )
-
-    history = history[-MAX_HISTORY_MESSAGES:]
-
-    return assistant_reply, history
+    return assistant_reply, conversation.get_history(user_id)
