@@ -11,6 +11,7 @@ try:
         normalize_words,
         tokenize_query,
     )
+    from .ranking import rank_products
 except ImportError:  # pragma: no cover - supports running main.py directly
     from filters import (
         BUDGET_KEYWORDS,
@@ -20,6 +21,7 @@ except ImportError:  # pragma: no cover - supports running main.py directly
         normalize_words,
         tokenize_query,
     )
+    from ranking import rank_products
 
 logger = logging.getLogger(__name__)
 
@@ -94,4 +96,4 @@ def search_products(query: str = "") -> list[dict]:
     for p in unique:
         logger.debug("- %s (৳%s)", p["name"], p["price"])
 
-    return unique
+    return rank_products(unique, query, tokens=words, budget=budget)
