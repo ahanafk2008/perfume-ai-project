@@ -4,7 +4,7 @@ Intent detection for Perfume AI Assistant.
 
 from __future__ import annotations
 
-import re
+from .normalize import normalize
 from enum import Enum
 
 
@@ -12,9 +12,21 @@ class Intent(str, Enum):
     GREETING = "greeting"
     THANKS = "thanks"
     GOODBYE = "goodbye"
+    CASUAL = "casual"
     PRODUCT_SEARCH = "product_search"
     UNKNOWN = "unknown"
 
+CASUAL = {
+    "nice",
+    "perfect",
+    "great",
+    "awesome",
+    "cool",
+    "ok",
+    "okay",
+    "good",
+    "excellent",
+}
 
 GREETINGS = {
     # English
@@ -67,6 +79,7 @@ GREETINGS = {
 
 
 THANKS = {
+    # English
     "thanks",
     "thank you",
     "thankyou",
@@ -74,23 +87,46 @@ THANKS = {
     "thanks a lot",
     "thank you so much",
     "many thanks",
+    "great thanks",
+    "thanks so much",
+    "thanks buddy",
+    "thanks bro",
+    "thanks brother",
+    "thanks man",
+    "thanks sir",
+    "thanks dear",
+    "thanks again",
     "appreciate it",
+    "much appreciated",
     "thx",
     "ty",
     "tysm",
+
+    # Islamic
+    "jazakallah",
+    "jazak allah",
+    "jazakallah khair",
+    "jazakallahu khair",
+    "jazakallah khairan",
 
     # Bangla
     "ধন্যবাদ",
     "অনেক ধন্যবাদ",
     "অনেক অনেক ধন্যবাদ",
     "আপনাকে ধন্যবাদ",
+    "ধন্যবাদ ভাই",
+    "ধন্যবাদ আপনাকে",
+    "অসংখ্য ধন্যবাদ",
+    "অনেক অনেক ধন্যবাদ ভাই",
 
     # Banglish
     "dhonnobad",
     "onek dhonnobad",
     "apnake dhonnobad",
+    "dhonnobad bhai",
+    "onek onek dhonnobad",
+    "osonkho dhonnobad",
 }
-
 
 GOODBYES = {
     "bye",
@@ -102,6 +138,12 @@ GOODBYES = {
     "take care",
     "have a good day",
     "have a nice day",
+    "talk later",
+    "i will come later",
+    "that's all",
+    "thats all",
+    "no more",
+    "done",
 
     # Bangla
     "বিদায়",
@@ -235,19 +277,6 @@ PRODUCT_KEYWORDS = {
 }
 
 
-def normalize(text: str) -> str:
-    text = text.lower().strip()
-
-    text = re.sub(
-        r"[^\w\s\u0980-\u09FF]",
-        "",
-        text
-    )
-
-    text = re.sub(r"\s+", " ", text)
-
-    return text
-
 
 def matches_phrase(message: str, phrases: set[str]) -> bool:
     """
@@ -258,13 +287,18 @@ def matches_phrase(message: str, phrases: set[str]) -> bool:
 
 def starts_with_phrase(message: str, phrases: set[str]) -> bool:
     """
-    Allow greetings with extra words.
-    Example: hi bhai, hello sir
+    Allow a phrase to match exactly or at the beginning of a message.
+    Example:
+        hi
+        hi brother
+        thanks
+        thanks a lot
     """
     return any(
-        message.startswith(phrase + " ")
+        message == phrase or message.startswith(phrase + " ")
         for phrase in phrases
     )
+
 
 
 def contains_keyword(message: str, keywords: set[str]) -> bool:
@@ -289,7 +323,10 @@ def detect_intent(message: str, debug: bool = False) -> Intent:
     result = Intent.UNKNOWN
 
     # Exact goodbye/thanks/greeting first
-    if matches_phrase(message, THANKS):
+    if (
+    matches_phrase(message, THANKS)
+    or starts_with_phrase(message, THANKS)
+):
         result = Intent.THANKS
 
     elif matches_phrase(message, GOODBYES):
@@ -298,9 +335,12 @@ def detect_intent(message: str, debug: bool = False) -> Intent:
     elif matches_phrase(message, GREETINGS) or starts_with_phrase(message, GREETINGS):
         result = Intent.GREETING
 
+    elif matches_phrase(message, CASUAL):
+        result = Intent.CASUAL
+
     elif contains_keyword(message, PRODUCT_KEYWORDS):
         result = Intent.PRODUCT_SEARCH
-
+    
     if debug:
         print(f"Input: {message}")
         print(f"Detected: {result}")

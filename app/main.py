@@ -1,9 +1,9 @@
 import logging
 
-from faq import get_faq_answer
-from intent import Intent, detect_intent
-from ollama_ai import ask_ai
-from search import search_products
+from .faq import get_faq_answer
+from .intent import Intent, detect_intent
+from .ollama_ai import ask_ai
+from .search import search_products
 
 logging.basicConfig(
     level=logging.INFO,
