@@ -4,22 +4,29 @@ Frequently Asked Questions.
 
 from __future__ import annotations
 
+
 FAQS = {
     "delivery": {
         "keywords": [
             "delivery",
+            "deliver",
             "shipping",
             "courier",
+            "home delivery",
             "ডেলিভারি",
-            "shipping charge",
         ],
-        "answer": "",
+        "answer": (
+            "Yes, we provide delivery service across Bangladesh. "
+            "Delivery time and charges may vary depending on your location."
+        ),
     },
+
     "payment": {
         "keywords": [
             "payment",
+            "pay",
             "bkash",
-            "bkash",
+            "bikash",
             "nagad",
             "rocket",
             "cash on delivery",
@@ -28,8 +35,12 @@ FAQS = {
             "বিকাশ",
             "নগদ",
         ],
-        "answer": "",
+        "answer": (
+            "We accept available payment methods. "
+            "Cash on delivery and mobile payment options may be available."
+        ),
     },
+
     "exchange": {
         "keywords": [
             "exchange",
@@ -38,8 +49,12 @@ FAQS = {
             "change product",
             "এক্সচেঞ্জ",
         ],
-        "answer": "",
+        "answer": (
+            "For exchange requests, please contact Scent Of Time customer support "
+            "with your order details."
+        ),
     },
+
     "return": {
         "keywords": [
             "return",
@@ -48,18 +63,27 @@ FAQS = {
             "রিটার্ন",
             "রিফান্ড",
         ],
-        "answer": "",
+        "answer": (
+            "For return or refund requests, please contact Scent Of Time customer "
+            "support with your order information."
+        ),
     },
+
     "contact": {
         "keywords": [
             "contact",
             "phone",
             "number",
             "whatsapp",
+            "facebook",
             "যোগাযোগ",
         ],
-        "answer": "",
+        "answer": (
+            "You can contact Scent Of Time through their official Facebook page "
+            "or WhatsApp for assistance."
+        ),
     },
+
     "business_hours": {
         "keywords": [
             "open",
@@ -67,21 +91,58 @@ FAQS = {
             "time",
             "hours",
             "working hour",
+            "when open",
+            "when close",
             "কখন খোলা",
             "কখন বন্ধ",
         ],
-        "answer": "",
+        "answer": (
+            "Please contact Scent Of Time for the latest store opening hours."
+        ),
     },
+
     "location": {
         "keywords": [
             "location",
             "address",
             "shop",
             "store",
+            "where are you",
+            "where located",
             "কোথায়",
             "ঠিকানা",
         ],
-        "answer": "",
+        "answer": (
+            "Please contact Scent Of Time for the exact store location."
+        ),
+    },
+
+    "product_quality": {
+        "keywords": [
+            "original",
+            "authentic",
+            "quality",
+            "fake",
+            "genuine",
+            "অরিজিনাল",
+        ],
+        "answer": (
+            "We provide quality perfumes and authentic products. "
+            "For specific product details, please ask about the perfume name."
+        ),
+    },
+
+    "customize": {
+        "keywords": [
+            "custom",
+            "customize",
+            "own fragrance",
+            "make perfume",
+        ],
+        "answer": (
+            "Yes, we have customized fragrance options available. "
+            "Tell us your preferred scent style and we can help."
+        ),
     },
 }
 
@@ -91,11 +152,11 @@ def get_faq_answer(message: str) -> str | None:
     Return an FAQ answer if the message matches.
     """
 
-    message = message.lower()
+    message = message.lower().strip()
 
     for faq in FAQS.values():
-        if any(keyword in message for keyword in faq["keywords"]):
-            if faq["answer"]:
+        for keyword in faq["keywords"]:
+            if keyword in message:
                 return faq["answer"]
 
     return None

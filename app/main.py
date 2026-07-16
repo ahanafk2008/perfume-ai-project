@@ -29,6 +29,9 @@ while True:
         # -----------------------------
         intent = detect_intent(user)
 
+        # -----------------------------
+        # Basic Conversations
+        # -----------------------------
         if intent == Intent.GREETING:
             print(
                 "\nAI:\n"
@@ -61,7 +64,7 @@ while True:
             continue
 
         # -----------------------------
-        # FAQ
+        # FAQ / Store Information
         # -----------------------------
         faq_answer = get_faq_answer(user)
 
@@ -70,22 +73,69 @@ while True:
             continue
 
         # -----------------------------
+        # Business Intents
+        # -----------------------------
+        if intent == Intent.DELIVERY:
+            print(
+                "\nAI:\n"
+                "Yes, we provide delivery service."
+            )
+            continue
+
+        if intent == Intent.PAYMENT:
+            print(
+                "\nAI:\n"
+                "We accept available payment methods. "
+                "Please contact Scent Of Time for payment details."
+            )
+            continue
+
+        if intent == Intent.LOCATION:
+            print(
+                "\nAI:\n"
+                "Please contact Scent Of Time for our store location."
+            )
+            continue
+
+        if intent == Intent.ORDER:
+            print(
+                "\nAI:\n"
+                "Great! I can help you place your order. 😊\n\n"
+                "Please provide:\n"
+                "• Perfume name\n"
+                "• Your name\n"
+                "• Phone number\n"
+                "• Delivery address\n\n"
+                "Once I have these details, we can proceed with your order."
+            )
+            continue
+
+        # -----------------------------
+        # Unknown Intent
+        # -----------------------------
+        if intent == Intent.UNKNOWN:
+            reply, _ = ask_ai(user, [])
+            print("\nAI:\n", reply)
+            continue
+
+        # -----------------------------
         # Product Search
         # -----------------------------
-        products = search_products(user)
+        products = []
 
-        print("\nProducts found:")
+        if intent == Intent.PRODUCT_SEARCH:
+            products = search_products(user)
 
-        if products:
-            for product in products:
-                print(
-                    f"{product['name']} | "
-                    f"{product['brand']} | "
-                    f"{product['category']} | "
-                    f"৳{product['price']}"
-                )
-        else:
-            print("No matching products.")
+            if products:
+                print("\nProducts found:")
+
+                for product in products:
+                    print(
+                        f"{product['name']} | "
+                        f"{product['brand']} | "
+                        f"{product['category']} | "
+                        f"৳{product['price']}"
+                    )
 
         # -----------------------------
         # AI Response
