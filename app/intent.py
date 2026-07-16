@@ -156,16 +156,14 @@ PRODUCT_KEYWORDS = {
 
     # Gender
     "men",
-    "man",
     "male",
     "women",
-    "woman",
     "female",
     "unisex",
 
     # Buying
     "buy",
-    "want",
+    "buying",
     "need",
     "looking for",
     "suggest",
@@ -214,7 +212,6 @@ PRODUCT_KEYWORDS = {
 
     # Combo
     "combo",
-    "set",
     "pack",
     "gift set",
 
@@ -231,12 +228,10 @@ PRODUCT_KEYWORDS = {
     # Banglish
     "perfume lagbe",
     "perfume chai",
-    "sugondhi",
     "attar lagbe",
-    "dam",
-    "koto",
-    "chele",
-    "meye",
+    "sugondhi chai",
+    "nibo ekta",
+    "perfume nibo",
 }
 
 
@@ -256,23 +251,36 @@ def normalize(text: str) -> str:
 
 def matches_phrase(message: str, phrases: set[str]) -> bool:
     """
-    Match complete phrases only.
-    Prevents false positives.
+    Match exact phrases only.
+    Prevent false positives.
+    """
+    return message in phrases
+
+def starts_with_phrase(message: str, phrases: set[str]) -> bool:
+    """
+    Allow greetings with extra words.
+    Example: hi bhai, hello sir
     """
     return any(
-        message == phrase or message.startswith(phrase + " ")
+        message.startswith(phrase + " ")
         for phrase in phrases
     )
 
 
 def contains_keyword(message: str, keywords: set[str]) -> bool:
-    """
-    Check if any keyword exists.
-    """
-    return any(
-        keyword in message
-        for keyword in keywords
-    )
+    words = set(message.split())
+
+    for keyword in keywords:
+        # Handle multi-word keywords
+        if " " in keyword:
+            if keyword in message:
+                return True
+
+        # Handle single words
+        elif keyword in words:
+            return True
+
+    return False
 
 
 def detect_intent(message: str, debug: bool = False) -> Intent:
@@ -280,18 +288,18 @@ def detect_intent(message: str, debug: bool = False) -> Intent:
 
     result = Intent.UNKNOWN
 
-    # Product has highest priority
-    if contains_keyword(message, PRODUCT_KEYWORDS):
-        result = Intent.PRODUCT_SEARCH
-
-    elif matches_phrase(message, THANKS):
+    # Exact goodbye/thanks/greeting first
+    if matches_phrase(message, THANKS):
         result = Intent.THANKS
 
     elif matches_phrase(message, GOODBYES):
         result = Intent.GOODBYE
 
-    elif matches_phrase(message, GREETINGS):
+    elif matches_phrase(message, GREETINGS) or starts_with_phrase(message, GREETINGS):
         result = Intent.GREETING
+
+    elif contains_keyword(message, PRODUCT_KEYWORDS):
+        result = Intent.PRODUCT_SEARCH
 
     if debug:
         print(f"Input: {message}")
