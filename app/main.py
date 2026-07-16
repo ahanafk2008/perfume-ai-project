@@ -1,5 +1,6 @@
 import logging
 
+from faq import get_faq_answer
 from intent import Intent, detect_intent
 from ollama_ai import ask_ai
 from search import search_products
@@ -10,6 +11,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
 
 while True:
     try:
@@ -22,7 +24,9 @@ while True:
             print("Type something.")
             continue
 
-        # Detect user intent first
+        # -----------------------------
+        # Intent Detection
+        # -----------------------------
         intent = detect_intent(user)
 
         if intent == Intent.GREETING:
@@ -31,10 +35,11 @@ while True:
                 "Hello! 👋\n\n"
                 "Welcome to Scent Of Time.\n\n"
                 "I can help you:\n"
-                "- Recommend perfumes\n"
-                "- Find perfumes by budget\n"
-                "- Compare fragrances\n"
-                "- Answer product questions\n\n"
+                "• Recommend perfumes\n"
+                "• Find perfumes within your budget\n"
+                "• Suggest gifts\n"
+                "• Compare fragrances\n"
+                "• Answer product questions\n\n"
                 "How can I help you today?"
             )
             continue
@@ -55,20 +60,43 @@ while True:
             )
             continue
 
+        # -----------------------------
+        # FAQ
+        # -----------------------------
+        faq_answer = get_faq_answer(user)
+
+        if faq_answer:
+            print("\nAI:\n", faq_answer)
+            continue
+
+        # -----------------------------
+        # Product Search
+        # -----------------------------
         products = search_products(user)
 
         print("\nProducts found:")
-        for p in products:
-            print(
-                f"{p['name']} | {p['brand']} | {p['category']} | ৳{p['price']}"
-            )
 
+        if products:
+            for product in products:
+                print(
+                    f"{product['name']} | "
+                    f"{product['brand']} | "
+                    f"{product['category']} | "
+                    f"৳{product['price']}"
+                )
+        else:
+            print("No matching products.")
+
+        # -----------------------------
+        # AI Response
+        # -----------------------------
         reply, _ = ask_ai(user, products)
 
         print("\nAI:\n", reply)
 
     except KeyboardInterrupt:
         break
+
     except Exception:
         logger.exception("Error processing query")
         print("\nSomething went wrong. Please try again.")

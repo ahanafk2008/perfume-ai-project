@@ -110,45 +110,212 @@ BUDGET_KEYWORDS: set[str] = {
 
 
 TYPO_CORRECTIONS: dict[str, str] = {
-    "savaj": "sauvage",
-    "savage": "sauvage",
+    # Lattafa
     "latafa": "lattafa",
+    "lattaf": "lattafa",
+    "lattaf": "lattafa",
+    "lattafah": "lattafa",
+    "lataf": "lattafa",
+
+    # Khamrah
+    "khamra": "khamrah",
+    "khamrahh": "khamrah",
+    "khamrahhh": "khamrah",
+
+    # Sauvage
+    "savage": "sauvage",
+    "savaj": "sauvage",
+    "savagee": "sauvage",
+    "savaz": "sauvage",
+    "sovage": "sauvage",
+    "suavage": "sauvage",
+
+    # Davidoff
     "devidoff": "davidoff",
+    "davidof": "davidoff",
+    "davidofff": "davidoff",
+
+    # Tom Ford
+    "tomford": "tom ford",
+    "tom-ford": "tom ford",
+    "tomfordd": "tom ford",
+
+    # Armani
+    "armanii": "armani",
+    "arman": "armani",
+
+    # Dior
+    "diorr": "dior",
+    "dioro": "dior",
+
+    # Rasasi
+    "rasaasi": "rasasi",
+    "rasassi": "rasasi",
+
+    # Hawas
+    "hawaz": "hawas",
+    "hawass": "hawas",
+    "hawass": "hawas",
+
+    # Yara
+    "yarra": "yara",
+    "yaara": "yara",
+
+    # Asad
+    "asaad": "asad",
+
+    # Fakhar
+    "fakar": "fakhar",
+    "fakkhar": "fakhar",
+
+    # Good Girl
+    "goodgirl": "good girl",
+
+    # Carolina Herrera
+    "carolina": "carolina herrera",
+    "herreraa": "herrera",
+
+    # Burberry
+    "burbery": "burberry",
+    "burbary": "burberry",
+
+    # Gucci
+    "guci": "gucci",
+
+    # Prada
+    "pradda": "prada",
+
+    # Versace
+    "versachi": "versace",
+    "versacce": "versace",
 }
 
 
 KNOWN_BRANDS: set[str] = {
-    "ajmal",
-    "armaf",
-    "davidoff",
-    "dior",
+    # Middle Eastern
     "lattafa",
     "rasasi",
+    "armaf",
+    "afnan",
+    "ajmal",
+    "al haramain",
+    "maison alhambra",
+    "fragrance world",
+    "pendora scents",
+    "ard al zaafaran",
+
+    # Designer
+    "dior",
+    "tom ford",
+    "gucci",
+    "prada",
+    "versace",
+    "armani",
+    "giorgio armani",
+    "burberry",
+    "carolina herrera",
+    "chanel",
+    "ysl",
+    "yves saint laurent",
+    "dolce & gabbana",
+    "dolce and gabbana",
+    "bvlgari",
+    "bulgari",
+    "paco rabanne",
+    "rabanne",
+    "hugo boss",
+    "boss",
+    "calvin klein",
+    "ck",
+    "givenchy",
+    "valentino",
+    "lacoste",
+    "montblanc",
+    "issey miyake",
+    "hermes",
+    "jo malone",
+    "mugler",
+    "narciso rodriguez",
+    "moschino",
+
+    # Niche
+    "mancera",
+    "montale",
+    "xerjoff",
+    "parfums de marly",
+    "creed",
+    "initio",
+    "amouage",
+    "roja",
+    "byredo",
+    "le labo",
+    "diptyque",
+    "kilian",
 }
 
 
 KNOWN_CATEGORIES: set[str] = {
-    "body",
-    "combo",
-    "deodorant",
+    # Fragrance types
+    "perfume",
+    "fragrance",
+    "attar",
+    "oud",
     "edp",
     "edt",
-    "mist",
-    "perfume",
+    "edc",
+    "parfum",
+    "extrait",
+
+    # Product types
     "spray",
+    "mist",
+    "body mist",
+    "body spray",
+    "deodorant",
+    "roll on",
+    "roll-on",
+
+    # Store categories
+    "combo",
+    "discovery",
+    "gift",
+    "gift set",
+
+    # Audience
+    "men",
+    "women",
+    "unisex",
+    "male",
+    "female",
 }
 
-
 COMBO_WORDS: set[str] = {
+    # English
     "combo",
     "combos",
     "set",
+    "gift set",
+    "giftset",
     "pack",
     "bundle",
+    "kit",
+    "collection",
+    "duo",
+    "pair",
+
+    # Banglish
+    "combo lagbe",
+    "set lagbe",
+    "gift set",
+    "giftset",
+
+    # Bangla
     "কম্বো",
     "সেট",
+    "গিফট সেট",
+    "প্যাক",
+    "বান্ডেল",
 }
-
 
 def correct_common_typos(word: str) -> str:
     """Correct a single common perfume-related typo."""

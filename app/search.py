@@ -100,6 +100,8 @@ def search_products(
 
 
     # Normalize query
+    query = query.lower().strip()
+    
     tokens = tokenize_query(query)
 
     tokens = tokens[:MAX_SEARCH_TOKENS]
