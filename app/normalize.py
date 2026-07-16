@@ -15,8 +15,6 @@ WORD_MAP = {
     "wife": "female",
     "woman": "female",
     "women": "female",
-    "womens": "female",
-    "womens": "female",
     "lady's": "female",
     "ladys": "female",
 
@@ -39,9 +37,15 @@ WORD_MAP = {
     # =====================================================
     # Product terms
     # =====================================================
+    "perfume": "perfume",
     "perfumes": "perfume",
+    "parfum": "perfume",
     "fragrance": "perfume",
     "fragrances": "perfume",
+    "পারফিউম": "perfume",
+    "সুগন্ধি": "perfume",
+    "আতর": "attar",
+
     "scents": "scent",
     "products": "product",
     "items": "product",
@@ -71,6 +75,12 @@ WORD_MAP = {
     "chele": "male",
     "meye": "female",
     "bhai": "bro",
+
+    # Common typos
+    "perfum": "perfume",
+    "parfume": "perfume",
+    "perfumee": "perfume",
+
 }
 
 def normalize(text: str) -> str:

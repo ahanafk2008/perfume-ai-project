@@ -3,6 +3,7 @@
 import re
 from collections.abc import Iterable
 
+from .normalize import normalize
 
 # Bangla, Banglish, and English normalization.
 NORMALIZATION: dict[str, str] = {
@@ -113,9 +114,8 @@ TYPO_CORRECTIONS: dict[str, str] = {
     # Lattafa
     "latafa": "lattafa",
     "lattaf": "lattafa",
-    "lattaf": "lattafa",
     "lattafah": "lattafa",
-    "lataf": "lattafa",
+    "lataf": "lattafa", 
 
     # Khamrah
     "khamra": "khamrah",
@@ -154,7 +154,6 @@ TYPO_CORRECTIONS: dict[str, str] = {
 
     # Hawas
     "hawaz": "hawas",
-    "hawass": "hawas",
     "hawass": "hawas",
 
     # Yara
@@ -348,7 +347,8 @@ def normalize_words(words: list[str]) -> list[str]:
 def tokenize_query(query: str) -> list[str]:
     """Return normalized search tokens from a raw user query."""
 
-    clean_query = re.sub(r"\d+", "", query.lower())
+    clean_query = normalize(query)
+    clean_query = re.sub(r"\d+", "", clean_query)
     clean_query = (
         clean_query
         .replace("৳", "")
@@ -362,7 +362,7 @@ def tokenize_query(query: str) -> list[str]:
 def extract_budget(query: str) -> int | None:
     """Extract a budget from English, Bangla, or Banglish query text."""
 
-    lower = query.lower()
+    lower = normalize(query)
 
     match = re.search(r"৳\s*(\d+)", query)
     if match:
@@ -432,6 +432,10 @@ def detect_category(query: str) -> str | None:
 def detect_combo(query: str) -> bool:
     """Return True when the query explicitly asks for a combo or set."""
 
-    raw_tokens = {correct_common_typos(word) for word in query.lower().split()}
+    raw_tokens = {
+        correct_common_typos(word)
+        for word in normalize(query).split()
+    }
+
     normalized_tokens = set(tokenize_query(query))
     return bool((raw_tokens | normalized_tokens) & COMBO_WORDS)
