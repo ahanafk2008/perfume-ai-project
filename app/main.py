@@ -1,5 +1,6 @@
 import logging
 
+from intent import Intent, detect_intent
 from ollama_ai import ask_ai
 from search import search_products
 
@@ -19,6 +20,39 @@ while True:
 
         if not user:
             print("Type something.")
+            continue
+
+        # Detect user intent first
+        intent = detect_intent(user)
+
+        if intent == Intent.GREETING:
+            print(
+                "\nAI:\n"
+                "Hello! 👋\n\n"
+                "Welcome to Scent Of Time.\n\n"
+                "I can help you:\n"
+                "- Recommend perfumes\n"
+                "- Find perfumes by budget\n"
+                "- Compare fragrances\n"
+                "- Answer product questions\n\n"
+                "How can I help you today?"
+            )
+            continue
+
+        if intent == Intent.THANKS:
+            print(
+                "\nAI:\n"
+                "You're welcome! 😊\n"
+                "If you need any perfume recommendations, just let me know."
+            )
+            continue
+
+        if intent == Intent.GOODBYE:
+            print(
+                "\nAI:\n"
+                "Thank you for visiting Scent Of Time.\n"
+                "Have a wonderful day! 👋"
+            )
             continue
 
         products = search_products(user)
