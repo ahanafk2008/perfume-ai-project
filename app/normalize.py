@@ -15,6 +15,7 @@ WORD_MAP = {
     "wife": "female",
     "woman": "female",
     "women": "female",
+    "womens": "female",
     "lady's": "female",
     "ladys": "female",
 
