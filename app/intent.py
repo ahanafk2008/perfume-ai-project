@@ -328,13 +328,15 @@ def detect_intent(
     # FAQ
     # -----------------------------
 
+    # Handle the exact payment phrase before generic delivery keywords.
+    elif "cash on delivery" in message:
+        result = Intent.PAYMENT
+
     elif contains_keyword(message, DELIVERY_KEYWORDS):
         result = Intent.DELIVERY
 
-
     elif contains_keyword(message, PAYMENT_KEYWORDS):
         result = Intent.PAYMENT
-
 
     elif contains_keyword(message, LOCATION_KEYWORDS):
         result = Intent.LOCATION
