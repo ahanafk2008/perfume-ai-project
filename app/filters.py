@@ -61,11 +61,8 @@ NORMALIZATION: dict[str, str] = {
     # Unisex
     "unisex": "unisex",
 
-    # Perfume
-    "perfume": "",
-    "parfum": "",
-    "fragrance": "",
-    "পারফিউম": "",
+    # Perfume terms (previously these were destroyed by mapping to "")
+    # Removed empty string mapping to preserve user intent losslessly.
 }
 
 
@@ -187,6 +184,26 @@ TYPO_CORRECTIONS: dict[str, str] = {
     # Versace
     "versachi": "versace",
     "versacce": "versace",
+
+    # Chanel
+    "channel": "chanel",
+
+    # Paco Rabanne
+    "rabane": "rabanne",
+
+    # Mancera
+    "mansera": "mancera",
+
+    # Armaf
+    "armaaf": "armaf",
+    "armf": "armaf",
+
+    # Afnan
+    "affnan": "afnan",
+
+    # General Terms
+    "parfume": "perfume",
+    "fragnance": "fragrance",
 }
 
 
@@ -409,7 +426,18 @@ def detect_brand(
 
     brands = {brand.lower() for brand in (known_brands or KNOWN_BRANDS)}
     tokens = tokenize_query(query)
+    clean_query_str = " ".join(tokens)
 
+    # 1. Sort brands by length descending to match longest phrases first
+    sorted_brands = sorted(brands, key=len, reverse=True)
+
+    # 2. Search the normalized full query string for phrases
+    padded_query = f" {clean_query_str} "
+    for brand in sorted_brands:
+        if f" {brand} " in padded_query:
+            return brand
+
+    # 3. Fallback to token-based matching
     for token in tokens:
         if token in brands:
             return token
@@ -421,7 +449,18 @@ def detect_category(query: str) -> str | None:
     """Detect a product category-like token from the query, if present."""
 
     tokens = tokenize_query(query)
+    clean_query_str = " ".join(tokens)
 
+    # 1. Sort categories by length descending to match longest phrases first
+    sorted_categories = sorted(KNOWN_CATEGORIES, key=len, reverse=True)
+
+    # 2. Search the normalized full query string for phrases
+    padded_query = f" {clean_query_str} "
+    for category in sorted_categories:
+        if f" {category} " in padded_query:
+            return category
+
+    # 3. Fallback to token-based matching
     for token in tokens:
         if token in KNOWN_CATEGORIES:
             return token

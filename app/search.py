@@ -140,8 +140,13 @@ def search_products(
 
     # Database search
     candidates = fetch_product_candidates(
+        query=query,
         tokens=tokens,
         budget=budget,
+        gender=gender,
+        brand=brand,
+        category=category,
+        combo_requested=combo_requested,
     )
 
 

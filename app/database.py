@@ -129,8 +129,13 @@ def fetch_products(
 
 
 def fetch_product_candidates(
+    query: str,
     tokens: Sequence[str],
     budget: int | None = None,
+    gender: str | None = None,
+    brand: str | None = None,
+    category: str | None = None,
+    combo_requested: bool | None = None,
     db_path: Path = DEFAULT_DB_PATH,
 ) -> list[dict[str, Any]]:
     """
@@ -209,6 +214,20 @@ def fetch_product_candidates(
             + ")"
         )
 
+    if brand:
+        where_clauses.append("LOWER(brand) LIKE ?")
+        params.append(f"%{brand.lower()}%")
+
+    if category:
+        where_clauses.append("LOWER(category) LIKE ?")
+        params.append(f"%{category.lower()}%")
+
+    if combo_requested:
+        where_clauses.append(
+            "(LOWER(category) = 'combo' OR LOWER(name) LIKE '%combo%' OR "
+            "LOWER(name) LIKE '%set%' OR LOWER(name) LIKE '%gift%')"
+        )
+
     if budget is not None:
         where_clauses.append("price <= ?")
         params.append(budget)
@@ -221,7 +240,7 @@ def fetch_product_candidates(
 
     sql += """
     ORDER BY price ASC
-    LIMIT 50
+    LIMIT 100
     """
 
     logger.debug(

@@ -102,19 +102,35 @@ def _matches_budget(
 
 
 
-def _keyword_match_count(
+def _keyword_score(
     product: Mapping[str, Any],
     tokens: Sequence[str],
 ) -> int:
-    """Count matching keywords."""
+    """Calculate field-aware keyword score with strict word boundaries."""
 
-    text = _product_text(product)
+    name = f" {_text(product.get('name'))} "
+    brand = f" {_text(product.get('brand'))} "
+    category = f" {_text(product.get('category'))} "
+    description = f" {_text(product.get('description'))} "
 
-    return sum(
-        1
-        for token in set(tokens)
-        if token and token in text
-    )
+    score = 0
+    for token in set(tokens):
+        if not token:
+            continue
+            
+        padded_token = f" {token} "
+        
+        # Take the highest value field where the token appears
+        if padded_token in name:
+            score += 5
+        elif padded_token in brand:
+            score += 4
+        elif padded_token in category:
+            score += 3
+        elif padded_token in description:
+            score += 1
+
+    return score
 
 
 
@@ -227,12 +243,17 @@ def calculate_score(
 
 
 
-    # Exact product name
-    if (
-        product_name
-        and product_name in query_text
-    ):
-        score += EXACT_NAME_WEIGHT
+    # Exact product name matching
+    if product_name and query_text:
+        padded_query = f" {query_text} "
+        padded_product = f" {product_name} "
+        query_words = query_text.split()
+
+        if product_name == query_text:
+            score += EXACT_NAME_WEIGHT
+        elif len(query_words) > 1 and padded_query in padded_product:
+            # Multi-word phrase exists inside product name
+            score += int(EXACT_NAME_WEIGHT * 0.8)
 
 
 
@@ -302,18 +323,11 @@ def calculate_score(
 
 
 
-    # Keyword relevance
-    matches = _keyword_match_count(
+    # Field-aware keyword relevance
+    score += _keyword_score(
         product,
         tokens,
     )
-
-    if matches > 1:
-        score += min(
-            matches - 1,
-            MAX_KEYWORD_BONUS,
-        )
-
 
     return score
 
