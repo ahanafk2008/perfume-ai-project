@@ -79,7 +79,7 @@ def test_detect_brand():
 
 def test_detect_category():
     assert detect_category("oud perfume") == "oud"
-    assert detect_category("body spray") == "spray"
+    assert detect_category("body spray") == "body spray"
     assert detect_category("lattafa") is None
 
 

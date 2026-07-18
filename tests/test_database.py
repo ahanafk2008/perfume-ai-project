@@ -78,7 +78,8 @@ def test_fetch_product_candidates_brand(tmp_path):
     db = make_db(tmp_path)
 
     results = fetch_product_candidates(
-        ["lattafa"],
+        query="lattafa",
+        tokens=["lattafa"],
         db_path=db,
     )
 
@@ -89,7 +90,8 @@ def test_fetch_product_candidates_budget(tmp_path):
     db = make_db(tmp_path)
 
     results = fetch_product_candidates(
-        ["lattafa"],
+        query="lattafa under 1600",
+        tokens=["lattafa"],
         budget=1600,
         db_path=db,
     )
@@ -102,7 +104,8 @@ def test_fetch_product_candidates_name(tmp_path):
     db = make_db(tmp_path)
 
     results = fetch_product_candidates(
-        ["asad"],
+        query="asad",
+        tokens=["asad"],
         db_path=db,
     )
 
@@ -114,7 +117,8 @@ def test_fetch_product_candidates_no_match(tmp_path):
     db = make_db(tmp_path)
 
     results = fetch_product_candidates(
-        ["dior"],
+        query="dior",
+        tokens=["dior"],
         db_path=db,
     )
 

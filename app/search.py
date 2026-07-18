@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 try:
-    from .database import fetch_product_candidates
+    from .repositories.product_repository import ProductRepository
     from .filters import (
         extract_budget,
         tokenize_query,
@@ -25,7 +25,7 @@ try:
     from .ranking import rank_products
 
 except ImportError:  # pragma: no cover
-    from database import fetch_product_candidates
+    from repositories.product_repository import ProductRepository
     from filters import (
         extract_budget,
         tokenize_query,
@@ -139,7 +139,7 @@ def search_products(
 
 
     # Database search
-    candidates = fetch_product_candidates(
+    candidates = ProductRepository.search_candidates(
         query=query,
         tokens=tokens,
         budget=budget,
