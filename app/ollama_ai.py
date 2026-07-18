@@ -28,6 +28,7 @@ FALLBACK_MESSAGE = (
 def ask_ai(
     question: str,
     products: list[dict],
+    searched: bool,
     user_id: str = DEFAULT_USER_ID,
 ) -> tuple[str, list[dict]]:
     """
@@ -62,9 +63,16 @@ def ask_ai(
         prompt = build_prompt(
             user_message=question,
             products=products,
+            searched=searched,
             history=conversation.get_history(user_id),
             language=language,
         )
+
+        print("\n" + "=" * 80)
+        print("PROMPT SENT TO OLLAMA")
+        print("=" * 80)
+        print(prompt)
+        print("=" * 80 + "\n")
 
     except Exception:
         logger.exception("Prompt building failed")

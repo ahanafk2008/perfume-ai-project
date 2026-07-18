@@ -38,6 +38,7 @@ FINAL_RESPONSE_RULES: tuple[str, ...] = (
 def build_prompt(
     user_message: str,
     products: list[dict],
+    searched: bool,
     history: list[dict],
     language: str,
 ) -> str:
@@ -47,13 +48,20 @@ def build_prompt(
     safe_history = _sanitize_history(history)[-MAX_HISTORY_MESSAGES:]
     product_limit = min(len(products), MAX_PROMPT_PRODUCTS)
 
-    prompt = _compose_prompt(user_message, products[:product_limit], safe_history, language)
+    prompt = _compose_prompt(
+        user_message,
+        products[:product_limit],
+        searched,
+        safe_history,
+        language,
+    )
 
     while len(prompt) > PROMPT_HARD_LIMIT and safe_history:
         safe_history = safe_history[2:] if len(safe_history) > 1 else []
         prompt = _compose_prompt(
             user_message,
             products[:product_limit],
+            searched,
             safe_history,
             language,
         )
@@ -63,6 +71,7 @@ def build_prompt(
         prompt = _compose_prompt(
             user_message,
             products[:product_limit],
+            searched,
             safe_history,
             language,
         )
@@ -81,6 +90,7 @@ def build_prompt(
 def _compose_prompt(
     user_message: str,
     products: Sequence[Mapping[str, Any]],
+    searched: bool,
     history: Sequence[Mapping[str, str]],
     language: str,
 ) -> str:
@@ -90,7 +100,10 @@ def _compose_prompt(
         _section("System prompt", SYSTEM_PROMPT.strip()),
         _section("Conversation history", _format_history(history)),
         _section("Current customer message", user_message.strip()),
-        _section("Current product list", _format_products(products)),
+        _section(
+            "Current product list",
+            _format_products(products, searched),
+        ),
         _section("Final response instructions", _format_final_instructions(language)),
     ]
     return "\n\n".join(sections).strip()
@@ -133,11 +146,25 @@ def _format_history(history: Sequence[Mapping[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _format_products(products: Sequence[Mapping[str, Any]]) -> str:
+def _format_products(
+    products: Sequence[Mapping[str, Any]],
+    searched: bool,
+) -> str:
     """Format current product context with only available fields."""
 
+    if not searched:
+        return (
+            "No product search was performed. "
+            "This does NOT mean the store has no products. "
+            "If the customer asks generally about the store or its products, "
+            "answer using the system instructions."
+        )
+
     if not products:
-        return "No matching products were supplied."
+        return (
+            "A product search was performed, "
+            "but no matching products were found."
+        )
 
     lines: list[str] = []
 
@@ -150,7 +177,13 @@ def _format_products(products: Sequence[Mapping[str, Any]]) -> str:
         if variants:
             lines.append(f"   Available variants/sizes: {variants}")
 
-    return "\n".join(lines) if lines else "No matching products were supplied."
+    if not lines:
+        return (
+            "Product data was provided, but no displayable product information "
+            "was available. Do not assume the store has no products."
+        )
+
+    return "\n".join(lines)
 
 
 def _product_fields(product: Mapping[str, Any]) -> list[str]:

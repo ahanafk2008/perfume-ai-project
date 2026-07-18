@@ -411,7 +411,6 @@ def tokenize_query(query: str) -> list[str]:
     """Return normalized search tokens from a raw user query."""
 
     clean_query = normalize(query)
-    print("Normalized:", repr(clean_query))   # DEBUG
 
     clean_query = re.sub(r"\d+", "", clean_query)
 
@@ -423,8 +422,6 @@ def tokenize_query(query: str) -> list[str]:
     )
 
     tokens = normalize_words(clean_query.split())
-
-    print("Tokens:", tokens)   # DEBUG
 
     return tokens
 

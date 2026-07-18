@@ -16,6 +16,8 @@ class Intent(str, Enum):
     GOODBYE = "goodbye"
     CASUAL = "casual"
 
+    STORE_INFO = "store_info"
+
     PRODUCT_SEARCH = "product_search"
 
     DELIVERY = "delivery"
@@ -29,6 +31,25 @@ class Intent(str, Enum):
 # -----------------------------
 # Conversation
 # -----------------------------
+
+STORE_INFO_KEYWORDS = {
+    "what do you sell",
+    "what do you have",
+    "what products",
+    "what are you selling",
+    "what do you guys sell",
+    "what does your shop sell",
+
+    "কি বিক্রি করেন",
+    "কি কি বিক্রি করেন",
+    "কি আছে",
+
+    "ki bikri koren",
+    "ki ki bikri koren",
+    "ki ase",
+    "apnara ki bikri koren",
+    "apnara ki ki bikri koren",
+}
 
 GREETINGS = {
     "hi",
@@ -302,11 +323,11 @@ def detect_intent(
     previous_intent: Optional[Intent] = None,
     debug: bool = False,
 ) -> Intent:
+    """Detect the user's intent."""
 
     message = normalize(message)
 
     result = Intent.UNKNOWN
-
 
     # -----------------------------
     # Conversation
@@ -315,20 +336,16 @@ def detect_intent(
     if starts_with_phrase(message, THANKS):
         result = Intent.THANKS
 
-
     elif starts_with_phrase(message, GOODBYES):
         result = Intent.GOODBYE
 
-
     elif starts_with_phrase(message, GREETINGS):
         result = Intent.GREETING
-
 
     # -----------------------------
     # FAQ
     # -----------------------------
 
-    # Handle the exact payment phrase before generic delivery keywords.
     elif "cash on delivery" in message:
         result = Intent.PAYMENT
 
@@ -341,30 +358,22 @@ def detect_intent(
     elif contains_keyword(message, LOCATION_KEYWORDS):
         result = Intent.LOCATION
 
+    # -----------------------------
+    # Store information
+    # -----------------------------
+
+    elif contains_keyword(message, STORE_INFO_KEYWORDS):
+        result = Intent.STORE_INFO
 
     # -----------------------------
     # Product Search
-    # IMPORTANT:
-    # Must come before order.
-    #
-    # Examples:
-    # "i want lattafa under 2000"
-    # "show me oud perfume"
-    # "best perfume under 1000"
     # -----------------------------
 
     elif contains_keyword(message, PRODUCT_KEYWORDS):
         result = Intent.PRODUCT_SEARCH
 
-
     # -----------------------------
     # Context order
-    #
-    # User selects a product after seeing results
-    #
-    # Example:
-    # AI: Lattafa Asad available
-    # User: i want this
     # -----------------------------
 
     elif (
@@ -383,19 +392,12 @@ def detect_intent(
     ):
         result = Intent.ORDER
 
-
     # -----------------------------
     # Strong order intent
-    #
-    # Example:
-    # order korbo
-    # checkout
-    # confirm order
     # -----------------------------
 
     elif contains_keyword(message, ORDER_KEYWORDS):
         result = Intent.ORDER
-
 
     # -----------------------------
     # Follow-up product question
@@ -407,7 +409,6 @@ def detect_intent(
     ):
         result = Intent.PRODUCT_SEARCH
 
-
     # -----------------------------
     # Casual
     # -----------------------------
@@ -415,12 +416,9 @@ def detect_intent(
     elif matches_phrase(message, CASUAL):
         result = Intent.CASUAL
 
-
-
     if debug:
         print(f"Input: {message}")
         print(f"Previous intent: {previous_intent}")
         print(f"Detected: {result}")
-
 
     return result
