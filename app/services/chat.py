@@ -1,17 +1,35 @@
 """Chat orchestration service."""
 
 import logging
-from typing import Any
 
 from app.faq import get_faq_answer
-from app.intent import Intent, detect_intent
-from app.ollama_ai import ask_ai
-from app.search import search_products
+from app.intent import Intent
+from app.services.intent import IntentService
+from app.services.ai import AIService
+from app.services.search import SearchService
 
 logger = logging.getLogger(__name__)
 
 class ChatService:
     """Orchestrates intent detection, product search, and AI interaction."""
+
+    def __init__(
+        self,
+        intent_service: IntentService | None = None,
+        search_service: SearchService | None = None,
+        ai_service: AIService | None = None,
+    ):
+        self.ai_service = (
+            ai_service if ai_service is not None else AIService()
+        )
+
+        self.intent_service = (
+            intent_service if intent_service is not None else IntentService()
+        )
+
+        self.search_service = (
+            search_service if search_service is not None else SearchService()
+        )
 
     def process_message(self, user_input: str) -> str:
         """Process a single user message and return the assistant's reply."""
@@ -19,7 +37,7 @@ class ChatService:
         if not user_input:
             return "Type something."
 
-        intent = detect_intent(user_input)
+        intent = self.intent_service.detect(user_input)
         print(f"Detected intent: {intent}")
 
         if intent == Intent.GREETING:
@@ -80,13 +98,13 @@ class ChatService:
             )
 
         if intent == Intent.UNKNOWN:
-            products = search_products(user_input)
+            products = self.search_service.search(user_input)
             print(f"Found {len(products)} products")
-            reply, _ = ask_ai(user_input, products)
+            reply, _ = self.ai_service.generate_reply(user_input, products)
             return f"\nAI:\n{reply}"
 
         # Product Search
-        products = search_products(user_input)
+        products = self.search_service.search(user_input)
         print(f'Found {len(products)} products')
 
         product_list_str = ""
@@ -100,7 +118,7 @@ class ChatService:
                     f"৳{product['price']}\n"
                 )
 
-        reply, _ = ask_ai(user_input, products)
+        reply, _ = self.ai_service.generate_reply(user_input, products)
         
         # We append the product list before the AI reply to match the previous CLI behavior exactly
         # where it printed the products, and then the AI reply.
