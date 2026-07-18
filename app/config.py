@@ -38,7 +38,7 @@ DEFAULT_PROVIDER: str = os.getenv(
 # Ollama
 OLLAMA_MODEL: str = os.getenv(
     "OLLAMA_MODEL",
-    "qwen3-coder:30b",
+    "qwen3:14b",
 )
 
 

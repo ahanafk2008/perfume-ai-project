@@ -27,7 +27,8 @@ while True:
         # -----------------------------
         # Intent Detection
         # -----------------------------
-        intent = detect_intent(user)
+        intent = detect_intent(user)   
+        print(f"Detected intent: {intent}")
 
         # -----------------------------
         # Basic Conversations
@@ -113,29 +114,31 @@ while True:
         # -----------------------------
         # Unknown Intent
         # -----------------------------
+        
         if intent == Intent.UNKNOWN:
-            reply, _ = ask_ai(user, [])
+            products = search_products(user)
+            print(f"Found {len(products)} products")
+
+            reply, _ = ask_ai(user, products)
             print("\nAI:\n", reply)
             continue
 
         # -----------------------------
         # Product Search
         # -----------------------------
-        products = []
+        products = search_products(user)
+        print(f'Found {len(products)} products')
 
-        if intent == Intent.PRODUCT_SEARCH:
-            products = search_products(user)
+        if products:
+            print('\nProducts found:')
 
-            if products:
-                print("\nProducts found:")
-
-                for product in products:
-                    print(
-                        f"{product['name']} | "
-                        f"{product['brand']} | "
-                        f"{product['category']} | "
-                        f"৳{product['price']}"
-                    )
+            for product in products:
+                print(
+                    f"{product['name']} | "
+                    f"{product['brand']} | "
+                    f"{product['category']} | "
+                    f"৳{product['price']}"
+                )
 
         # -----------------------------
         # AI Response

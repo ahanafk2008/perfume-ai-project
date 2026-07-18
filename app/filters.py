@@ -23,6 +23,7 @@ NORMALIZATION: dict[str, str] = {
     "father": "male",
     "dad": "male",
     "brother": "male",
+
     # Female
     "fiancee": "female",
     "fiancée": "female",
@@ -61,12 +62,20 @@ NORMALIZATION: dict[str, str] = {
     # Unisex
     "unisex": "unisex",
 
-    # Perfume terms (previously these were destroyed by mapping to "")
-    # Removed empty string mapping to preserve user intent losslessly.
+    # Search intent normalization
+    "cheapest": "cheap",
+    "lowest": "cheap",
+    "low": "cheap",
+
+    "highest": "expensive",
+    "luxury": "premium",
+
+    "longlasting": "long lasting",
+    "long-lasting": "long lasting",
 }
 
-
 STOP_WORDS: set[str] = {
+    # English
     "under",
     "below",
     "within",
@@ -78,19 +87,45 @@ STOP_WORDS: set[str] = {
     "need",
     "want",
     "please",
-    "er",
-    "moddhe",
-    "jonno",
+    "list",
+    "all",
+    "give",
+    "available",
+    "have",
+
+    # Banglish
+    "ki",
     "ase",
+    "ache",
+    "apnader",
+    "tomader",
+    "amader",
+    "amar",
+    "amake",
     "lagbe",
     "chai",
-    "টাকার",
-    "টাকা",
-    "মধ্যে",
-    "জন্য",
-    "দেখান",
-    "চাই",
+    "jonno",
+    "moddhe",
+    "dekhan",
+    "ekta",
+    "ekti",
+
+    # Bangla
+    "কি",
     "আছে",
+    "আসে",
+    "আমাদের",
+    "আপনাদের",
+    "চাই",
+    "জন্য",
+    "মধ্যে",
+    "দেখান",
+
+    # Generic perfume words
+    "perfume",
+    "perfumes",
+    "fragrance",
+    "parfum",
 }
 
 
@@ -341,22 +376,33 @@ def correct_common_typos(word: str) -> str:
 
 
 def normalize_words(words: list[str]) -> list[str]:
-    """Normalize words by removing stop words and mapping known synonyms."""
+    """Normalize words, remove stop words, fix typos, and remove duplicates."""
 
     normalized: list[str] = []
+    seen: set[str] = set()
 
     for word in words:
-        word = correct_common_typos(word)
+        word = correct_common_typos(word).strip().lower()
 
+        if not word:
+            continue
+
+        # Remove conversational words
         if word in STOP_WORDS:
             continue
 
-        if word in NORMALIZATION:
-            mapped = NORMALIZATION[word]
-            if mapped:
-                normalized.append(mapped)
-        else:
-            normalized.append(word)
+        # Normalize synonyms
+        word = NORMALIZATION.get(word, word)
+
+        if not word:
+            continue
+
+        # Remove duplicates while preserving order
+        if word in seen:
+            continue
+
+        seen.add(word)
+        normalized.append(word)
 
     return normalized
 
@@ -365,7 +411,10 @@ def tokenize_query(query: str) -> list[str]:
     """Return normalized search tokens from a raw user query."""
 
     clean_query = normalize(query)
+    print("Normalized:", repr(clean_query))   # DEBUG
+
     clean_query = re.sub(r"\d+", "", clean_query)
+
     clean_query = (
         clean_query
         .replace("৳", "")
@@ -373,7 +422,11 @@ def tokenize_query(query: str) -> list[str]:
         .replace("taka", "")
     )
 
-    return normalize_words(clean_query.split())
+    tokens = normalize_words(clean_query.split())
+
+    print("Tokens:", tokens)   # DEBUG
+
+    return tokens
 
 
 def extract_budget(query: str) -> int | None:
@@ -478,3 +531,24 @@ def detect_combo(query: str) -> bool:
 
     normalized_tokens = set(tokenize_query(query))
     return bool((raw_tokens | normalized_tokens) & COMBO_WORDS)
+
+def detect_sort(query: str) -> str | None:
+    q = normalize(query)
+
+    if any(word in q for word in (
+        "cheap",
+        "cheapest",
+        "lowest",
+        "low price",
+    )):
+        return "cheap"
+
+    if any(word in q for word in (
+        "expensive",
+        "highest",
+        "premium",
+        "luxury",
+    )):
+        return "expensive"
+
+    return None

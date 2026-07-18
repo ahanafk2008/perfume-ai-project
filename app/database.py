@@ -170,14 +170,55 @@ def fetch_product_candidates(
         }
     ]
 
-    if search_tokens:
-        unique_tokens = search_tokens
+    # Common conversational words that shouldn't affect search.
+    STOP_WORDS = {
+        "ki",
+        "ase",
+        "ache",
+        "apnader",
+        "tomader",
+        "amader",
+        "amar",
+        "chai",
+        "ekta",
+        "ekti",
+        "please",
+        "show",
+        "list",
+        "all",
+    }
+
+    # Remove stop words.
+    search_tokens = [
+        token
+        for token in search_tokens
+        if token not in STOP_WORDS
+    ]
+
+    # Use cleaned tokens.
+    unique_tokens = search_tokens
+
+    # General browsing query → return some products.
+    if (
+        not unique_tokens
+        and brand is None
+        and category is None
+        and budget is None
+    ):
+        return execute_query(
+            """
+            SELECT *
+            FROM products
+            ORDER BY price ASC
+            LIMIT 20
+            """,
+            db_path=db_path,
+        )
 
     # Security: prevent huge queries
     unique_tokens = unique_tokens[:20]
 
     for token in unique_tokens:
-
         conditions.append(
             """
             (
@@ -209,9 +250,7 @@ def fetch_product_candidates(
 
     if conditions:
         where_clauses.append(
-            "("
-            + " OR ".join(conditions)
-            + ")"
+            "(" + " OR ".join(conditions) + ")"
         )
 
     if brand:
@@ -224,8 +263,10 @@ def fetch_product_candidates(
 
     if combo_requested:
         where_clauses.append(
-            "(LOWER(category) = 'combo' OR LOWER(name) LIKE '%combo%' OR "
-            "LOWER(name) LIKE '%set%' OR LOWER(name) LIKE '%gift%')"
+            "(LOWER(category) = 'combo' "
+            "OR LOWER(name) LIKE '%combo%' "
+            "OR LOWER(name) LIKE '%set%' "
+            "OR LOWER(name) LIKE '%gift%')"
         )
 
     if budget is not None:
@@ -233,16 +274,12 @@ def fetch_product_candidates(
         params.append(budget)
 
     if where_clauses:
-        sql += (
-            " WHERE "
-            + " AND ".join(where_clauses)
-        )
+        sql += " WHERE " + " AND ".join(where_clauses)
 
     sql += """
     ORDER BY price ASC
     LIMIT 100
     """
-
     logger.debug(
         "Product search SQL executed with %d parameters",
         len(params),
