@@ -76,7 +76,7 @@ def _deduplicate_products(
 
 def search_products(
     query: str = "",
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     Complete product search pipeline.
 
@@ -120,15 +120,7 @@ def search_products(
 
 
     logger.debug(
-        """
-        Search Intent:
-        tokens=%s
-        budget=%s
-        gender=%s
-        brand=%s
-        category=%s
-        combo=%s
-        """,
+        "Search intent | tokens=%s budget=%s gender=%s brand=%s category=%s combo=%s",
         tokens,
         budget,
         gender,

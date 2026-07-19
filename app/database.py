@@ -204,6 +204,7 @@ def fetch_product_candidates(
         and brand is None
         and category is None
         and budget is None
+        and gender is None
     ):
         return execute_query(
             """
@@ -260,6 +261,17 @@ def fetch_product_candidates(
     if category:
         where_clauses.append("LOWER(category) LIKE ?")
         params.append(f"%{category.lower()}%")
+
+    if gender:
+        gender_category_map = {
+            "male": "men",
+            "female": "women",
+            "unisex": "unisex",
+        }
+        db_gender = gender_category_map.get(gender)
+        if db_gender:
+            where_clauses.append("LOWER(category) = ?")
+            params.append(db_gender)
 
     if combo_requested:
         where_clauses.append(

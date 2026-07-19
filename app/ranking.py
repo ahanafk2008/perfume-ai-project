@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 import logging
+import re
 from typing import Any
 
 try:
@@ -45,17 +46,36 @@ WRONG_GENDER_PENALTY = -100
 MAX_KEYWORD_BONUS = 5
 
 
+MALE_WORDS = {
+    "male",
+    "men",
+    "man",
+    "boy",
+}
+
+FEMALE_WORDS = {
+    "female",
+    "women",
+    "woman",
+    "girl",
+    "lady",
+}
+
+
 def _text(value: Any) -> str:
-    """Normalize text."""
+    """Normalize a value to lowercase, whitespace-trimmed text."""
 
-    return str(value or "").lower()
+    return str(value or "").lower().strip()
 
 
+def _tokenize(text: str) -> set[str]:
+    """Split normalized text into a set of lowercase word tokens."""
 
-def _product_text(
-    product: Mapping[str, Any],
-) -> str:
-    """Return searchable product text."""
+    return set(re.findall(r"\w+", text.lower()))
+
+
+def _product_text(product: Mapping[str, Any]) -> str:
+    """Return searchable, normalized product text."""
 
     fields = (
         product.get("name"),
@@ -64,74 +84,56 @@ def _product_text(
         product.get("description"),
     )
 
-    return " ".join(
-        _text(field)
-        for field in fields
-    )
+    return " ".join(_text(field) for field in fields)
 
 
+def _is_combo_product(product: Mapping[str, Any]) -> bool:
+    """Detect combo products using token intersection (no substring matching)."""
 
-def _is_combo_product(
-    product: Mapping[str, Any],
-) -> bool:
-    """Detect combo products."""
+    tokens = _tokenize(_product_text(product))
 
-    text = _product_text(product)
-
-    return any(
-        word in text
-        for word in COMBO_WORDS
-    )
-
+    return bool(tokens & set(COMBO_WORDS))
 
 
 def _matches_budget(
     product: Mapping[str, Any],
     budget: int | None,
 ) -> bool:
-    """Check budget."""
+    """Check whether a product fits within the given budget."""
 
     if budget is None:
         return False
 
     try:
         return float(product.get("price", 0)) <= budget
-
     except (TypeError, ValueError):
         return False
-
 
 
 def _keyword_score(
     product: Mapping[str, Any],
     tokens: Sequence[str],
 ) -> int:
-    """Calculate field-aware keyword score with strict word boundaries."""
+    """
+    Calculate keyword relevance using normalized, token-based word matching.
+    """
 
-    name = f" {_text(product.get('name'))} "
-    brand = f" {_text(product.get('brand'))} "
-    category = f" {_text(product.get('category'))} "
-    description = f" {_text(product.get('description'))} "
+    fields = {
+        "name": (_tokenize(_text(product.get("name"))), 5),
+        "brand": (_tokenize(_text(product.get("brand"))), 4),
+        "category": (_tokenize(_text(product.get("category"))), 3),
+        "description": (_tokenize(_text(product.get("description"))), 1),
+    }
 
     score = 0
-    for token in set(tokens):
-        if not token:
-            continue
-            
-        padded_token = f" {token} "
-        
-        # Take the highest value field where the token appears
-        if padded_token in name:
-            score += 5
-        elif padded_token in brand:
-            score += 4
-        elif padded_token in category:
-            score += 3
-        elif padded_token in description:
-            score += 1
+
+    for token in {t.lower() for t in tokens if t}:
+        for words, weight in fields.values():
+            if token in words:
+                score += weight
+                break
 
     return score
-
 
 
 def _gender_penalty(
@@ -139,44 +141,24 @@ def _gender_penalty(
     gender: str | None,
 ) -> int:
     """
-    Penalize wrong gender products.
+    Penalize products that target the opposite gender.
+
+    Uses token-based matching to avoid false positives such as
+    "womanizer" being treated as matching "man".
     """
 
-    if not gender:
+    if gender is None:
         return 0
 
+    product_words = _tokenize(product_text)
 
-    if gender == "male":
+    if gender == "male" and product_words & FEMALE_WORDS:
+        return WRONG_GENDER_PENALTY
 
-        if any(
-            word in product_text
-            for word in [
-                "female",
-                "women",
-                "woman",
-                "girl",
-                "lady",
-            ]
-        ):
-            return WRONG_GENDER_PENALTY
-
-
-    if gender == "female":
-
-        if any(
-            word in product_text
-            for word in [
-                "male",
-                "men",
-                "man",
-                "boy",
-            ]
-        ):
-            return WRONG_GENDER_PENALTY
-
+    if gender == "female" and product_words & MALE_WORDS:
+        return WRONG_GENDER_PENALTY
 
     return 0
-
 
 
 def calculate_score(
@@ -192,56 +174,21 @@ def calculate_score(
 ) -> int:
     """Calculate product relevance score."""
 
-    tokens = (
-        tokens
-        if tokens is not None
-        else tokenize_query(query)
-    )
-
-    gender = (
-        gender
-        if gender is not None
-        else detect_gender(query)
-    )
-
-    brand = (
-        brand
-        if brand is not None
-        else detect_brand(query)
-    )
-
-    category = (
-        category
-        if category is not None
-        else detect_category(query)
-    )
-
+    tokens = tokens if tokens is not None else tokenize_query(query)
+    gender = gender if gender is not None else detect_gender(query)
+    brand = brand if brand is not None else detect_brand(query)
+    category = category if category is not None else detect_category(query)
     combo_requested = (
-        combo_requested
-        if combo_requested is not None
-        else detect_combo(query)
+        combo_requested if combo_requested is not None else detect_combo(query)
     )
-
 
     score = 0
 
     query_text = _text(query)
-
-    product_name = _text(
-        product.get("name")
-    )
-
-    product_brand = _text(
-        product.get("brand")
-    )
-
-    product_category = _text(
-        product.get("category")
-    )
-
+    product_name = _text(product.get("name"))
+    product_brand = _text(product.get("brand"))
+    product_category = _text(product.get("category"))
     product_text = _product_text(product)
-
-
 
     # Exact product name matching
     if product_name and query_text:
@@ -255,114 +202,72 @@ def calculate_score(
             # Multi-word phrase exists inside product name
             score += int(EXACT_NAME_WEIGHT * 0.8)
 
-
-
     # Brand match
-    if brand and brand in product_brand:
+    if brand and brand.lower() in product_brand:
         score += BRAND_WEIGHT
 
-
-
     # Category match
-    if category and category in product_category:
+    if category and category.lower() in product_category:
         score += CATEGORY_WEIGHT
 
-
-
-    # Gender match
+    # Gender match (token-based, using shared gender word constants)
     if gender:
+        product_words = _tokenize(product_text)
 
-        if gender == "male":
-            if any(word in product_text for word in [
-                "male",
-                "men",
-                "man",
-                "boy"
-            ]):
-                score += GENDER_WEIGHT
-
-
-        elif gender == "female":
-            if any(word in product_text for word in [
-                "female",
-                "women",
-                "woman",
-                "girl",
-                "lady"
-            ]):
-                score += GENDER_WEIGHT
-
-
+        if gender == "male" and product_words & MALE_WORDS:
+            score += GENDER_WEIGHT
+        elif gender == "female" and product_words & FEMALE_WORDS:
+            score += GENDER_WEIGHT
 
     # Wrong gender penalty
-    score += _gender_penalty(
-        product_text,
-        gender,
-    )
-
-
-
+    score += _gender_penalty(product_text, gender)
 
     # Budget
-    if _matches_budget(
-        product,
-        budget,
-    ):
+    if _matches_budget(product, budget):
         score += BUDGET_WEIGHT
 
-
-
-    # Combo handling
+    # Combo handling (token-based)
     is_combo = _is_combo_product(product)
 
     if combo_requested and is_combo:
         score += COMBO_MATCH_WEIGHT
-
     elif not combo_requested and is_combo:
         score += UNREQUESTED_COMBO_PENALTY
 
-
-
     # Field-aware keyword relevance
-    score += _keyword_score(
-        product,
-        tokens,
-    )
+    score += _keyword_score(product, tokens)
 
     return score
-
 
 
 def _deduplicate_products(
     products: Sequence[Mapping[str, Any]],
 ) -> list[Mapping[str, Any]]:
-    """Remove duplicates."""
+    """
+    Remove duplicate products using product id or a stable name+brand
+    fingerprint. Never relies on Python's built-in object id().
+    """
 
     unique = []
     seen = set()
 
-
     for product in products:
-
         product_id = product.get("id")
 
-        identifier = (
-            product_id
-            if product_id is not None
-            else id(product)
-        )
-
+        if product_id is not None:
+            identifier = f"id:{product_id}"
+        else:
+            name = _text(product.get("name"))
+            brand = _text(product.get("brand"))
+            identifier = f"name:{name}|brand:{brand}"
 
         if identifier in seen:
             continue
 
-
-        unique.append(product)
         seen.add(identifier)
-
+        unique.append(product)
 
     return unique
-
 
 
 def rank_products(
@@ -377,47 +282,28 @@ def rank_products(
     combo_requested: bool | None = None,
     max_results: int = MAX_SEARCH_RESULTS,
 ) -> list[dict[str, Any]]:
+    """
+    Rank and return the best matching products.
+    """
 
-    """Rank and return best products."""
+    # Normalize query
+    query = query.lower().strip()
 
+    # Remove duplicates
     unique_products = _deduplicate_products(products)
 
-
-    tokens = (
-        tokens
-        if tokens is not None
-        else tokenize_query(query)
-    )
-
-    gender = (
-        gender
-        if gender is not None
-        else detect_gender(query)
-    )
-
-    brand = (
-        brand
-        if brand is not None
-        else detect_brand(query)
-    )
-
-    category = (
-        category
-        if category is not None
-        else detect_category(query)
-    )
-
+    # Detect query information if not provided
+    tokens = tokens if tokens is not None else tokenize_query(query)
+    gender = gender if gender is not None else detect_gender(query)
+    brand = brand if brand is not None else detect_brand(query)
+    category = category if category is not None else detect_category(query)
     combo_requested = (
-        combo_requested
-        if combo_requested is not None
-        else detect_combo(query)
+        combo_requested if combo_requested is not None else detect_combo(query)
     )
 
     scored = []
 
-
     for index, product in enumerate(unique_products):
-
         score = calculate_score(
             product,
             query,
@@ -429,31 +315,16 @@ def rank_products(
             combo_requested=combo_requested,
         )
 
-        scored.append(
-            (
-                score,
-                index,
-                product,
-            )
-        )
+        scored.append((score, index, product))
 
-
-    scored.sort(
-        key=lambda item: (
-            -item[0],
-            item[1],
-        )
-    )
-
+    # Highest score first; keep original order when scores are equal
+    scored.sort(key=lambda item: (-item[0], item[1]))
 
     logger.debug(
-        "Ranked %d products for query=%s",
+        "Ranked %d unique products from %d input products for query='%s'",
         len(scored),
+        len(products),
         query,
     )
 
-
-    return [
-        dict(product)
-        for _, _, product in scored[:max_results]
-    ]
+    return [dict(product) for _, _, product in scored[:max_results]]

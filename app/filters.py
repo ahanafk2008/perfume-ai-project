@@ -93,6 +93,42 @@ STOP_WORDS: set[str] = {
     "available",
     "have",
 
+    # Non-search conversational words
+    "best",
+    "good",
+    "great",
+    "nice",
+    "recommend",
+    "suggest",
+    "find",
+    "looking",
+    "get",
+    "buy",
+    "gift",
+    "for",
+    "me",
+    "my",
+    "some",
+    "any",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "can",
+    "you",
+    "i",
+    "do",
+    "what",
+
+    # Budget-related (extracted separately)
+    "less",
+    "than",
+    "max",
+    "maximum",
+    "upto",
+    "up",
+
     # Banglish
     "ki",
     "ase",
@@ -134,6 +170,9 @@ BUDGET_KEYWORDS: set[str] = {
     "below",
     "within",
     "budget",
+    "max",
+    "maximum",
+    "upto",
     "taka",
     "tk",
     "টাকার",
@@ -332,12 +371,8 @@ KNOWN_CATEGORIES: set[str] = {
     "gift",
     "gift set",
 
-    # Audience
-    "men",
-    "women",
-    "unisex",
-    "male",
-    "female",
+    # Note: gender words (men, women, male, female, unisex) are
+    # intentionally NOT here. Gender is handled by detect_gender().
 }
 
 COMBO_WORDS: set[str] = {
@@ -434,6 +469,16 @@ def extract_budget(query: str) -> int | None:
     match = re.search(r"৳\s*(\d+)", query)
     if match:
         return int(match.group(1))
+
+    # Multi-word budget phrases
+    multi_word_patterns = [
+        r"less\s+than\s+(\d+)",
+        r"up\s+to\s+(\d+)",
+    ]
+    for pattern in multi_word_patterns:
+        match = re.search(pattern, lower)
+        if match:
+            return int(match.group(1))
 
     for keyword in BUDGET_KEYWORDS:
         pattern = rf"\b{re.escape(keyword)}\s+(\d+)"

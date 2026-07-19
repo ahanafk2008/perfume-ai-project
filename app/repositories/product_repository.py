@@ -11,9 +11,10 @@ from app.database import (
     fetch_products,
 )
 
+
 class ProductRepository:
-    """Repository for product data access."""
-    
+    """Repository providing access to product data."""
+
     @staticmethod
     def search_candidates(
         query: str,
@@ -25,7 +26,9 @@ class ProductRepository:
         combo_requested: bool | None = None,
         db_path: Path = DEFAULT_DB_PATH,
     ) -> list[dict[str, Any]]:
-        """Search products by token and optional budget."""
+        """
+        Search for product candidates using the supplied filters.
+        """
         return fetch_product_candidates(
             query=query,
             tokens=tokens,
@@ -38,11 +41,20 @@ class ProductRepository:
         )
 
     @staticmethod
-    def get_all(db_path: Path = DEFAULT_DB_PATH) -> list[dict[str, Any]]:
+    def get_all(
+        db_path: Path = DEFAULT_DB_PATH,
+    ) -> list[dict[str, Any]]:
         """Return all products."""
         return fetch_products(db_path=db_path)
 
     @staticmethod
-    def get_by_id(product_id: str, db_path: Path = DEFAULT_DB_PATH) -> dict[str, Any] | None:
-        """Return one product by ID."""
-        return fetch_product_by_id(product_id=product_id, db_path=db_path)
+    def get_by_id(
+        product_id: str,
+        db_path: Path = DEFAULT_DB_PATH,
+    ) -> dict[str, Any] | None:
+        """Return a single product by its ID."""
+        return fetch_product_by_id(
+            product_id=product_id,
+            db_path=db_path,
+        )
+

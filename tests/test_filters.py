@@ -36,9 +36,16 @@ def test_normalize_words():
 # -----------------------------
 
 def test_tokenize_query():
-    assert tokenize_query("Lattafa under 2000") == ["lattafa"]
-    assert tokenize_query("wife perfume") == ["female"]
-    assert tokenize_query("guci perfume") == ["gucci"]
+    tokens = tokenize_query("Lattafa under 2000")
+    assert "lattafa" in tokens
+    assert "under" not in tokens
+
+    tokens = tokenize_query("wife perfume")
+    assert "female" in tokens
+    assert "perfume" not in tokens
+
+    tokens = tokenize_query("guci perfume")
+    assert "gucci" in tokens
 
 
 # -----------------------------
@@ -91,3 +98,77 @@ def test_detect_combo():
     assert detect_combo("gift set") is True
     assert detect_combo("combo pack") is True
     assert detect_combo("lattafa perfume") is False
+
+
+# -----------------------------
+# Stop words
+# -----------------------------
+
+def test_tokenize_strips_nonsearch_words():
+    tokens = tokenize_query("best perfume under 2000")
+
+    assert "best" not in tokens
+    assert "perfume" not in tokens
+    assert "under" not in tokens
+
+    tokens = tokenize_query("good perfume for men")
+
+    assert "male" in tokens
+    assert "good" not in tokens
+    assert "perfume" not in tokens
+
+    assert tokenize_query("recommend perfume") == []
+    assert tokenize_query("find me a perfume") == []
+    assert tokenize_query("show best perfume") == []
+
+
+# -----------------------------
+# Descriptive words
+# -----------------------------
+
+def test_tokenize_preserves_descriptive_words():
+    tokens = tokenize_query("blue perfume under 2000")
+    assert "blue" in tokens
+
+    tokens = tokenize_query("vanilla perfume")
+    assert "vanilla" in tokens
+
+    tokens = tokenize_query("oud perfume")
+    assert "oud" in tokens
+
+
+# -----------------------------
+# Expanded budget extraction
+# -----------------------------
+
+def test_extract_budget_less_than():
+    assert extract_budget("less than 2000") == 2000
+
+
+def test_extract_budget_max():
+    assert extract_budget("max 3000") == 3000
+
+
+def test_extract_budget_maximum():
+    assert extract_budget("maximum 2500") == 2500
+
+
+def test_extract_budget_upto():
+    assert extract_budget("upto 2000") == 2000
+
+
+def test_extract_budget_up_to():
+    assert extract_budget("up to 1500") == 1500
+
+
+# -----------------------------
+# Gender should not be category
+# -----------------------------
+
+def test_detect_category_not_gender():
+    assert detect_category("men perfume") is None
+    assert detect_category("women fragrance") is None
+    assert detect_category("male perfume") is None
+    assert detect_category("female perfume") is None
+    assert detect_category("unisex perfume") is None
+

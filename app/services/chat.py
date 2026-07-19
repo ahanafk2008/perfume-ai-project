@@ -3,7 +3,6 @@
 import logging
 
 from app.faq import get_faq_answer
-from app.intent import Intent
 from app.services.ai import AIService
 from app.services.conversation import ConversationService
 from app.services.intent import IntentService
@@ -55,19 +54,30 @@ class ChatService:
         intent = self.intent_service.detect(user_input)
         logger.debug("Detected intent: %s", intent)
 
-        # Fixed conversation responses
+        # Fixed conversation responses (greetings, thanks, FAQ, etc.).
+        # If this returns a reply, that intent is fully handled and we
+        # never reach the search step below.
         conversation_reply = self.conversation_service.handle(intent)
         if conversation_reply:
             return conversation_reply
 
-        # Search products
-        products = []
-        searched = False
-
-        if intent != Intent.UNKNOWN:
-            searched = True
-            products = self.search_service.search(user_input)
-            logger.debug("Found %d products", len(products))
+        # Search products.
+        #
+        # IMPORTANT: this is intentionally NOT gated on
+        # `intent != Intent.UNKNOWN`. Intent detection is keyword-based
+        # and can never cover every way a customer phrases a product
+        # query (an unlisted brand, a typo, unusual wording). Any of
+        # those can legitimately fall through to Intent.UNKNOWN even
+        # though the customer is clearly asking about products.
+        # Everything that reaches this point has already had a chance
+        # to short-circuit above (greetings, FAQ, store info, etc. all
+        # return early via conversation_service), so it's always worth
+        # attempting a real search here. ChatService owns this
+        # decision; SearchService decides what (if anything) matches,
+        # and PromptBuilder only formats whatever it's given.
+        searched = True
+        products = self.search_service.search(user_input)
+        logger.debug("Found %d products", len(products))
 
         # Generate AI response
         reply, _ = self.ai_service.generate_reply(
