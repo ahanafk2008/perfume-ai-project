@@ -6,41 +6,6 @@ from __future__ import annotations
 
 
 FAQS = {
-    "delivery": {
-        "keywords": [
-            "delivery",
-            "deliver",
-            "shipping",
-            "courier",
-            "home delivery",
-            "ডেলিভারি",
-        ],
-        "answer": (
-            "Yes, we provide delivery service across Bangladesh. "
-            "Delivery time and charges may vary depending on your location."
-        ),
-    },
-
-    "payment": {
-        "keywords": [
-            "payment",
-            "pay",
-            "bkash",
-            "bikash",
-            "nagad",
-            "rocket",
-            "cash on delivery",
-            "cod",
-            "পেমেন্ট",
-            "বিকাশ",
-            "নগদ",
-        ],
-        "answer": (
-            "We accept available payment methods. "
-            "Cash on delivery and mobile payment options may be available."
-        ),
-    },
-
     "exchange": {
         "keywords": [
             "exchange",
@@ -98,22 +63,6 @@ FAQS = {
         ],
         "answer": (
             "Please contact Scent Of Time for the latest store opening hours."
-        ),
-    },
-
-    "location": {
-        "keywords": [
-            "location",
-            "address",
-            "shop",
-            "store",
-            "where are you",
-            "where located",
-            "কোথায়",
-            "ঠিকানা",
-        ],
-        "answer": (
-            "Please contact Scent Of Time for the exact store location."
         ),
     },
 

@@ -3,6 +3,7 @@
 import logging
 
 from app.faq import get_faq_answer
+from app.intent import Intent
 from app.services.ai import AIService
 from app.services.conversation import ConversationService
 from app.services.intent import IntentService
@@ -39,20 +40,21 @@ class ChatService:
             else ConversationService()
         )
 
+        self.previous_intent: Intent | None = None
+
     def process_message(self, user_input: str) -> str:
         """Process a single user message and return the assistant's reply."""
 
         if not user_input:
             return "Type something."
 
-        # FAQ responses
-        faq_answer = get_faq_answer(user_input)
-        if faq_answer:
-            return f"\nAI:\n{faq_answer}"
-
-        # Detect intent
-        intent = self.intent_service.detect(user_input)
+        # Detect intent (with previous-turn context for follow-ups).
+        intent = self.intent_service.detect(
+            user_input,
+            previous_intent=self.previous_intent,
+        )
         logger.debug("Detected intent: %s", intent)
+        self.previous_intent = intent
 
         # Fixed conversation responses (greetings, thanks, FAQ, etc.).
         # If this returns a reply, that intent is fully handled and we
@@ -60,6 +62,14 @@ class ChatService:
         conversation_reply = self.conversation_service.handle(intent)
         if conversation_reply:
             return conversation_reply
+
+        # Keyword-only FAQ topics that do not have a dedicated Intent
+        # (exchange, return, contact, business hours, etc.). Run after
+        # ConversationService so intents with handlers are authoritative
+        # and FAQ never double-answers them.
+        faq_answer = get_faq_answer(user_input)
+        if faq_answer:
+            return f"\nAI:\n{faq_answer}"
 
         # Search products.
         #

@@ -9,7 +9,6 @@ Handles:
 """
 
 import logging
-from collections.abc import Mapping
 from typing import Any
 
 try:
@@ -41,37 +40,6 @@ logger = logging.getLogger(__name__)
 
 
 MAX_SEARCH_TOKENS = 15
-
-
-def _deduplicate_products(
-    products: list[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    """
-    Remove duplicate products while preserving order.
-    """
-
-    unique: list[dict[str, Any]] = []
-
-    seen_ids: set[Any] = set()
-
-    for product in products:
-
-        product_id = product.get("id")
-
-        identifier = (
-            product_id
-            if product_id is not None
-            else id(product)
-        )
-
-        if identifier in seen_ids:
-            continue
-
-        unique.append(dict(product))
-        seen_ids.add(identifier)
-
-    return unique
-
 
 
 def search_products(
@@ -150,19 +118,15 @@ def search_products(
         return []
 
 
-    unique_candidates = _deduplicate_products(
-        candidates
-    )
-
     logger.debug(
-        "Candidates after cleanup: %d",
-        len(unique_candidates),
+        "Candidates: %d",
+        len(candidates),
     )
 
 
     # Ranking with intent information
     return rank_products(
-        unique_candidates,
+        candidates,
         query,
         tokens=tokens,
         budget=budget,

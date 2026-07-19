@@ -68,12 +68,6 @@ def ask_ai(
             language=language,
         )
 
-        print("\n" + "=" * 80)
-        print("PROMPT SENT TO OLLAMA")
-        print("=" * 80)
-        print(prompt)
-        print("=" * 80 + "\n")
-
     except Exception:
         logger.exception("Prompt building failed")
 
