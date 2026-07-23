@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Iterable
+from typing import Any
 
 from .normalize import normalize
 
@@ -164,6 +165,20 @@ STOP_WORDS: set[str] = {
     "perfumes",
     "fragrance",
     "parfum",
+
+    # Connectors / fillers
+    "but",
+    "very",
+    "just",
+    "also",
+    "too",
+
+    # Price intent words (detected separately from raw query)
+    "cheap",
+    "cheapest",
+    "affordable",
+    "value",
+    "economy",
 }
 
 
@@ -620,3 +635,307 @@ def detect_sort(query: str) -> str | None:
         return "expensive"
 
     return None
+
+
+def detect_occasion(query: str) -> str | None:
+    """Detect occasion keywords from query."""
+    occasion_keywords = {
+        "office": "office",
+        "work": "office",
+        "professional": "office",
+        "formal": "office",
+        "corporate": "office",
+        "office wear": "office",
+
+        "date": "date",
+        "dating": "date",
+        "romantic": "date",
+        "dinner": "date",
+        "night out": "date",
+        "night out": "date",
+
+        "party": "party",
+        "club": "party",
+        "nightclub": "party",
+        "event": "party",
+        "wedding": "wedding",
+        "marriage": "wedding",
+        "reception": "wedding",
+        "function": "wedding",
+
+        "casual": "casual",
+        "everyday": "casual",
+        "daily": "casual",
+        "everyday wear": "casual",
+        "regular": "casual",
+    }
+
+    q = normalize(query)
+    for keyword, occasion in occasion_keywords.items():
+        if keyword in q:
+            return occasion
+    return None
+
+
+def detect_scent(query: str) -> str | None:
+    """Detect scent preference keywords from query."""
+    scent_keywords = {
+        "sweet": "sweet",
+        "sugary": "sweet",
+        "candy": "sweet",
+        "dessert": "sweet",
+
+        "fresh": "fresh",
+        "clean": "fresh",
+        "aqua": "fresh",
+        "aquatic": "fresh",
+        "marine": "fresh",
+        "ocean": "fresh",
+
+        "woody": "woody",
+        "wood": "woody",
+        "forest": "woody",
+        "earthy": "woody",
+
+        "oud": "oud",
+        "oudh": "oud",
+        "agar": "oud",
+
+        "spicy": "spicy",
+        "pepper": "spicy",
+        "ginger": "spicy",
+        "hot": "spicy",
+
+        "vanilla": "vanilla",
+
+        "floral": "floral",
+        "flower": "floral",
+        "flowers": "floral",
+        "rose": "floral",
+        "jasmine": "floral",
+        "jasmin": "floral",
+        "lavender": "floral",
+        "peony": "floral",
+        "tuberose": "floral",
+    }
+
+    q = normalize(query)
+    for keyword, scent in scent_keywords.items():
+        if keyword in q:
+            return scent
+    return None
+
+
+def detect_performance(query: str) -> str | None:
+    """Detect performance/longevity keywords from query."""
+    performance_keywords = {
+        "long lasting": "longlasting",
+        "long-lasting": "longlasting",
+        "longlasting": "longlasting",
+        "lasting": "longlasting",
+        "stays long": "longlasting",
+        "stay long": "longlasting",
+        "lasts long": "longlasting",
+        "long time": "longlasting",
+        "hours": "longlasting",
+
+        "strong": "strong",
+        "powerful": "strong",
+        "intense": "strong",
+        "beast mode": "strong",
+        "beast": "strong",
+
+        "projection": "projection",
+        "throw": "projection",
+        "sillage": "projection",
+        "spreads": "projection",
+        "fill room": "projection",
+
+        "compliment": "compliment",
+        "compliments": "compliment",
+        "gets compliments": "compliment",
+        "attract": "compliment",
+        "attention": "compliment",
+    }
+
+    q = normalize(query)
+    for keyword, perf in performance_keywords.items():
+        if keyword in q:
+            return perf
+    return None
+
+
+def detect_similarity(query: str) -> str | None:
+    """Detect similarity/reference product from query."""
+    # Patterns like "similar to X", "like X", "alternative to X"
+    patterns = [
+        r"similar\s+to\s+([a-z0-9\s]+?)(?:\s+and|\s+perfume|\s+fragrance|$)",
+        r"like\s+([a-z0-9\s]+?)(?:\s+and|\s+perfume|\s+fragrance|$)",
+        r"alternative\s+to\s+([a-z0-9\s]+?)(?:\s+and|\s+perfume|\s+fragrance|$)",
+        r"comparable\s+to\s+([a-z0-9\s]+?)(?:\s+and|\s+perfume|\s+fragrance|$)",
+        r"inspired\s+by\s+([a-z0-9\s]+?)(?:\s+and|\s+perfume|\s+fragrance|$)",
+    ]
+
+    q = normalize(query)
+    for pattern in patterns:
+        match = re.search(pattern, q)
+        if match:
+            reference = match.group(1).strip()
+            if reference:
+                return reference
+    return None
+
+
+RECOMMENDATION_WORDS: set[str] = {
+    "best",
+    "recommend",
+    "recommended",
+    "suggest",
+    "suggestion",
+    "top",
+    "top rated",
+    "popular",
+    "favorite",
+    "most popular",
+    "highest",
+}
+
+
+def detect_recommendation(query: str) -> bool:
+    """Detect whether the query is asking for a recommendation or top products."""
+    q = normalize(query)
+    for word in RECOMMENDATION_WORDS:
+        if word in q:
+            return True
+    return False
+
+
+LUXURY_WORDS: set[str] = {
+    "luxury",
+    "luxurious",
+    "premium",
+    "designer",
+    "high end",
+    "high-end",
+    "expensive",
+    "signature",
+    "exclusive",
+    "elite",
+    "classy",
+    "sophisticated",
+    "high quality",
+}
+
+
+def detect_luxury(query: str) -> bool:
+    """Detect whether the query asks for luxury, designer, or premium products."""
+    q = normalize(query)
+    for word in LUXURY_WORDS:
+        if word in q:
+            return True
+    return False
+
+
+GIFT_WORDS: set[str] = {
+    "gift",
+    "gifts",
+    "present",
+    "presents",
+    "valentine",
+    "anniversary",
+    "birthday",
+    "gift for",
+    "for wife",
+    "for husband",
+    "for her",
+    "for him",
+    "for mom",
+    "for dad",
+    "for mother",
+    "for father",
+    "for sister",
+    "for brother",
+    "for girlfriend",
+    "for boyfriend",
+    "উপহার",
+}
+
+
+def detect_gift(query: str) -> bool:
+    """Detect whether the query is asking for a gift.
+
+    Checks the raw query (for relational words like 'wife', 'husband' that
+    trigger gift intent even without explicit 'gift' or 'present' words)
+    and the normalized query (for standard gift words).
+    """
+    q_norm = normalize(query)
+    q_raw = query.lower().strip()
+
+    for word in GIFT_WORDS:
+        if word in q_norm or word in q_raw:
+            return True
+
+    # "for X" or "to X" where X is a relational word → gift intent
+    relational = {"wife", "husband", "her", "him", "girlfriend", "boyfriend", "mom", "dad",
+                  "mother", "father", "sister", "brother", "fiance", "fiancee"}
+    raw_tokens = q_raw.split()
+    for t in raw_tokens:
+        if t in relational:
+            return True
+
+    return False
+
+
+def detect_cheap_intent(query: str) -> bool:
+    """Detect cheap/budget/affordable intent without a specific price."""
+    q = normalize(query)
+    cheap_words = {"cheap", "cheapest", "affordable", "budget", "value", "economy", "reasonable", "discount"}
+    return any(w in q for w in cheap_words)
+
+
+SEASON_WORDS: dict[str, str] = {
+    "summer": "summer",
+    "hot": "summer",
+    "heat": "summer",
+    "sunny": "summer",
+    "warm": "summer",
+    "spring": "summer",
+    "winter": "winter",
+    "cold": "winter",
+    "cool": "winter",
+    "chilly": "winter",
+    "fall": "winter",
+    "autumn": "winter",
+    "rainy": "winter",
+    "monsoon": "winter",
+    "গ্রীষ্ম": "summer",
+    "গরম": "summer",
+    "শীত": "winter",
+    "ঠান্ডা": "winter",
+    "বর্ষা": "winter",
+}
+
+
+def detect_season(query: str) -> str | None:
+    """Detect season preference from query."""
+    q = normalize(query)
+    for keyword, season in SEASON_WORDS.items():
+        if keyword in q:
+            return season
+    return None
+
+
+def extract_structured_filters(query: str) -> dict[str, Any]:
+    """Extract all structured filters from query."""
+    return {
+        "occasion": detect_occasion(query),
+        "scent": detect_scent(query),
+        "performance": detect_performance(query),
+        "season": detect_season(query),
+        "similar_to": detect_similarity(query),
+        "recommendation": detect_recommendation(query),
+        "luxury": detect_luxury(query),
+        "gift": detect_gift(query),
+        "cheap_intent": detect_cheap_intent(query),
+        "sort": detect_sort(query),
+    }

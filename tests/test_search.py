@@ -149,3 +149,36 @@ def test_gift_under_3000():
     for product in results:
         assert product["price"] <= 3000
 
+
+# -----------------------------
+# New regression tests
+# -----------------------------
+
+def test_brand_not_found_does_not_return_random_products():
+    """Regression: when brand requested but missing, don't return unrelated products."""
+    results = search_products("do you have dior perfumes?")
+    assert isinstance(results, list)
+    if results:
+        for product in results:
+            assert "dior" in product.get("brand", "").lower()
+
+
+def test_longlasting_query():
+    """Regression: long-lasting queries should not crash."""
+    results = search_products("suggest a long lasting perfume")
+    assert isinstance(results, list)
+
+
+def test_cheap_query():
+    """Regression: cheap queries should prioritize low price."""
+    results = search_products("cheap but good perfume")
+    assert isinstance(results, list)
+    if len(results) > 1:
+        for i in range(len(results) - 1):
+            assert results[i]["price"] <= results[i + 1]["price"]
+
+
+def test_similarity_query():
+    """Regression: similarity queries should not crash."""
+    results = search_products("something similar to dior sauvage")
+    assert isinstance(results, list)

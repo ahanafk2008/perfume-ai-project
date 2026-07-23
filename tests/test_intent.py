@@ -118,7 +118,25 @@ def test_followup():
             "which one",
             previous_intent=Intent.PRODUCT_SEARCH,
         )
+        == Intent.FOLLOW_UP
+    )
+
+
+def test_product_followup():
+    """Regression: product info questions after search should use PRODUCT_INFO."""
+    # Turn 1: product search
+    assert (
+        detect_intent("show me men's perfumes")
         == Intent.PRODUCT_SEARCH
+    )
+
+    # Turn 2: follow-up product info
+    assert (
+        detect_intent(
+            "how long does it last?",
+            previous_intent=Intent.PRODUCT_SEARCH,
+        )
+        == Intent.PRODUCT_INFO
     )
 
 

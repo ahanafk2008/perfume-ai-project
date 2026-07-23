@@ -7,6 +7,9 @@ from app.filters import (
     detect_brand,
     detect_category,
     detect_combo,
+    detect_recommendation,
+    detect_luxury,
+    detect_performance,
 )
 
 
@@ -107,7 +110,7 @@ def test_detect_combo():
 def test_tokenize_strips_nonsearch_words():
     tokens = tokenize_query("best perfume under 2000")
 
-    assert "best" not in tokens
+    assert "best" not in tokens  # stop word, detect_recommendation uses raw query
     assert "perfume" not in tokens
     assert "under" not in tokens
 
@@ -254,4 +257,116 @@ def test_budget_enforcement_custom():
                 f"Product {product.get('name')} costs {product.get('price')} "
                 f"which exceeds {budget_str}"
             )
+
+
+# -----------------------------
+# Recommendation intent detection
+# -----------------------------
+
+def test_detect_recommendation():
+    assert detect_recommendation("best perfume") is True
+    assert detect_recommendation("recommend a perfume") is True
+    assert detect_recommendation("top fragrance") is True
+    assert detect_recommendation("popular perfume") is True
+    assert detect_recommendation("cheap perfume") is False
+    assert detect_recommendation("show me perfumes") is False
+    assert detect_recommendation("what is available") is False
+
+
+def test_detect_recommendation_bangla():
+    assert detect_recommendation("best পারফিউম") is True
+    assert detect_recommendation("ভালো পারফিউম") is False
+
+
+# -----------------------------
+# Performance attribute detection
+# -----------------------------
+
+def test_detect_performance():
+    assert detect_performance("long lasting perfume") is not None
+    assert detect_performance("suggest a long lasting perfume") is not None
+    assert detect_performance("strong perfume") is not None
+    assert detect_performance("beast mode perfume") is not None
+    assert detect_performance("good projection") is not None
+    assert detect_performance("show me perfumes") is None
+
+
+# -----------------------------
+# Luxury intent detection
+# -----------------------------
+
+def test_detect_luxury():
+    assert detect_luxury("luxury perfume") is True
+    assert detect_luxury("premium fragrance") is True
+    assert detect_luxury("designer perfume") is True
+    assert detect_luxury("high end perfume") is True
+    assert detect_luxury("expensive perfume") is True
+    assert detect_luxury("signature scent") is True
+    assert detect_luxury("exclusive perfume") is True
+    assert detect_luxury("best perfume") is False  # not luxury-specific
+    assert detect_luxury("cheap perfume") is False
+
+
+# -----------------------------
+# Gift intent detection
+# -----------------------------
+
+def test_detect_gift():
+    from app.filters import detect_gift
+    assert detect_gift("gift for wife") is True
+    assert detect_gift("gift for husband") is True
+    assert detect_gift("birthday gift") is True
+    assert detect_gift("anniversary present") is True
+    assert detect_gift("valentine gift") is True
+    assert detect_gift("for her") is True
+    assert detect_gift("for him") is True
+    assert detect_gift("show me perfumes") is False
+    assert detect_gift("best perfume") is False
+
+
+# -----------------------------
+# Cheap/budget intent detection
+# -----------------------------
+
+def test_detect_cheap_intent():
+    from app.filters import detect_cheap_intent
+    assert detect_cheap_intent("cheap perfume") is True
+    assert detect_cheap_intent("cheapest perfume") is True
+    assert detect_cheap_intent("affordable perfume") is True
+    assert detect_cheap_intent("budget perfume") is True
+    assert detect_cheap_intent("value perfume") is True
+    assert detect_cheap_intent("economy perfume") is True
+    assert detect_cheap_intent("discount perfume") is True
+    assert detect_cheap_intent("reasonable price") is True
+    assert detect_cheap_intent("best perfume") is False
+    assert detect_cheap_intent("luxury perfume") is False
+
+
+# -----------------------------
+# Stop words include connectors
+# -----------------------------
+
+def test_tokenize_removes_connectors():
+    from app.filters import tokenize_query
+    tokens = tokenize_query("cheap but good perfume")
+    assert "cheap" not in tokens
+    assert "but" not in tokens
+    assert "good" not in tokens
+    tokens = tokenize_query("very nice perfume")
+    assert "very" not in tokens
+
+
+# -----------------------------
+# Season detection
+# -----------------------------
+
+def test_detect_season():
+    from app.filters import detect_season
+    assert detect_season("summer perfume") == "summer"
+    assert detect_season("winter fragrance") == "winter"
+    assert detect_season("hot weather perfume") == "summer"
+    assert detect_season("cold weather") == "winter"
+    assert detect_season("rainy season perfume") == "winter"
+    assert detect_season("office perfume") is None
+    assert detect_season("best perfume") is None
 

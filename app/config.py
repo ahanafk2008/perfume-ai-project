@@ -38,9 +38,8 @@ DEFAULT_PROVIDER: str = os.getenv(
 # Ollama
 OLLAMA_MODEL: str = os.getenv(
     "OLLAMA_MODEL",
-    "qwen3-coder:30b",
+    "qwen3:14b",
 )
-
 
 # Gemini
 GEMINI_MODEL: str = os.getenv(
@@ -92,7 +91,7 @@ TARGET_PROMPT_MIN: int = 1500
 
 TARGET_PROMPT_MAX: int = 2500
 
-PROMPT_HARD_LIMIT: int = 3000
+PROMPT_HARD_LIMIT: int = 8000
 
 
 # =========================

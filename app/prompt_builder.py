@@ -8,10 +8,12 @@ from typing import Any
 try:
     from .config import MAX_HISTORY_MESSAGES, PROMPT_HARD_LIMIT
     from .language import detect_language
+    from .product_attrs import format_product_attributes
     from .prompts import SYSTEM_PROMPT
 except ImportError:  # pragma: no cover - supports running modules directly
     from config import MAX_HISTORY_MESSAGES, PROMPT_HARD_LIMIT
     from language import detect_language
+    from product_attrs import format_product_attributes
     from prompts import SYSTEM_PROMPT
 
 
@@ -26,12 +28,10 @@ LANGUAGE_INSTRUCTIONS: dict[str, str] = {
 }
 
 FINAL_RESPONSE_RULES: tuple[str, ...] = (
+    "The product list below comes directly from the database.",
     "Recommend no more than 3 products.",
     "Never invent products, prices, stock, sizes, or attributes.",
-    "Recommend only from the supplied products.",
     "Prefer individual perfumes unless the customer asks for combos.",
-    "If nothing matches, say so politely.",
-    "Ask one follow-up question only if necessary.",
 )
 
 
@@ -42,49 +42,102 @@ def build_prompt(
     history: list[dict],
     language: str,
 ) -> str:
-    """Build one complete prompt for any AI provider."""
+    """Build one complete prompt for any AI provider.
+
+    Trims in order: conversation history first, then product fields.
+    """
 
     language = language or detect_language(user_message)
     safe_history = _sanitize_history(history)[-MAX_HISTORY_MESSAGES:]
     product_limit = min(len(products), MAX_PROMPT_PRODUCTS)
+    selected_products = products[:product_limit]
 
     prompt = _compose_prompt(
         user_message,
-        products[:product_limit],
+        selected_products,
         searched,
         safe_history,
         language,
     )
 
+    # Step 1: Trim conversation history. Never remove user query or products.
     while len(prompt) > PROMPT_HARD_LIMIT and safe_history:
         safe_history = safe_history[2:] if len(safe_history) > 1 else []
         prompt = _compose_prompt(
             user_message,
-            products[:product_limit],
+            selected_products,
             searched,
             safe_history,
             language,
         )
 
-    while len(prompt) > PROMPT_HARD_LIMIT and product_limit > 0:
-        product_limit -= 1
+    # Step 2: Trim product variants if still over the limit.
+    if len(prompt) > PROMPT_HARD_LIMIT:
+        trimmed = _without_variants(selected_products)
         prompt = _compose_prompt(
             user_message,
-            products[:product_limit],
+            trimmed,
             searched,
             safe_history,
             language,
         )
+
+    # Step 3: Keep only name + price if still over the limit.
+    if len(prompt) > PROMPT_HARD_LIMIT:
+        trimmed = _minimal_products(selected_products)
+        prompt = _compose_prompt(
+            user_message,
+            trimmed,
+            searched,
+            safe_history,
+            language,
+        )
+
+    # Log with section breakdown for debugging.
+    if logger.isEnabledFor(logging.DEBUG):
+        _log_section_sizes(user_message, selected_products, searched, safe_history, language)
 
     if len(prompt) > PROMPT_HARD_LIMIT:
         logger.warning(
-            "Prompt exceeds hard limit after trimming: %d characters",
+            "Prompt exceeds hard limit after all trimming: %d characters",
             len(prompt),
         )
     else:
         logger.info("Prompt length: %d characters", len(prompt))
 
+    _log_prompt_debug(
+        user_message,
+        selected_products,
+        searched,
+        prompt,
+    )
+
     return prompt
+
+
+def _log_prompt_debug(
+    user_message: str,
+    products: Sequence[Mapping[str, Any]],
+    searched: bool,
+    prompt: str,
+) -> None:
+    """Log prompt summary before sending to AI."""
+
+    product_names = [
+        product.get("name", "")
+        for product in products
+        if isinstance(product, Mapping) and product.get("name")
+    ]
+
+    logger.info(
+        "PROMPT DEBUG:\n"
+        "Length: %d\n"
+        "Products included: %d\n"
+        "Products:\n%s",
+        len(prompt),
+        len(products),
+        "\n".join(f"- {name}" for name in product_names) if product_names else "- None",
+    )
 
 
 def _compose_prompt(
@@ -101,7 +154,7 @@ def _compose_prompt(
         _section("Conversation history", _format_history(history)),
         _section("Current customer message", user_message.strip()),
         _section(
-            "Current product list",
+            "Available products",
             _format_products(products, searched),
         ),
         _section("Final response instructions", _format_final_instructions(language)),
@@ -168,6 +221,8 @@ def _format_products(
 
     lines: list[str] = []
 
+    lines.append("PRODUCTS:")
+
     for index, product in enumerate(products, start=1):
         fields = _product_fields(product)
         if fields:
@@ -187,18 +242,29 @@ def _format_products(
 
 
 def _product_fields(product: Mapping[str, Any]) -> list[str]:
-    """Return compact product fields that actually exist."""
+    """Return compact product fields that actually exist.
+
+    Only includes structured database fields (name, brand, category, price)
+    and structured fragrance attributes from fragrance_details.
+    Never includes unstructured description or tagline — those cause AI hallucination.
+    """
 
     fields: list[str] = []
 
     if product.get("name"):
-        fields.append(f"Name: {product['name']}")
+        fields.append(product["name"])
     if product.get("brand"):
-        fields.append(f"Brand: {product['brand']}")
+        fields.append(product["brand"])
     if product.get("category"):
-        fields.append(f"Category: {product['category']}")
+        fields.append(product["category"])
     if product.get("price") is not None:
-        fields.append(f"Price: ৳{product['price']}")
+        fields.append(f"৳{product['price']}")
+
+    attrs = format_product_attributes(product) if product.get("data") else None
+    if attrs:
+        fields.append(f"[{attrs}]")
+    elif product.get("data"):
+        fields.append("[No fragrance data]")
 
     return fields
 
@@ -233,11 +299,56 @@ def _format_variants(product: Mapping[str, Any]) -> str:
         price = variant.get("price")
 
         if size and price is not None:
-            formatted.append(f"{size}: ৳{price}")
+            formatted.append(f"{size}(৳{price})")
         elif size:
             formatted.append(str(size))
 
-    return "; ".join(formatted)
+    return ", ".join(formatted)
+
+
+def _without_variants(products: Sequence[Mapping[str, Any]]) -> list[dict]:
+    """Remove variant data (data field) from products to save space."""
+    return [{k: v for k, v in p.items() if k != "data"} for p in products]
+
+
+def _minimal_products(products: Sequence[Mapping[str, Any]]) -> list[dict]:
+    """Keep only name and price for minimal product context."""
+    minimal: list[dict] = []
+    for p in products:
+        entry: dict[str, Any] = {}
+        if p.get("name"):
+            entry["name"] = p["name"]
+        if p.get("price") is not None:
+            entry["price"] = p["price"]
+        minimal.append(entry)
+    return minimal
+
+
+def _log_section_sizes(
+    user_message: str,
+    products: Sequence[Mapping[str, Any]],
+    searched: bool,
+    history: Sequence[Mapping[str, str]],
+    language: str,
+) -> None:
+    """Log size of each prompt section (DEBUG level)."""
+
+    system_len = len(SYSTEM_PROMPT.strip())
+    history_len = len(_format_history(history))
+    user_len = len(user_message.strip())
+    products_len = len(_format_products(products, searched))
+    instructions_len = len(_format_final_instructions(language))
+
+    logger.debug(
+        "Section sizes (chars) — system: %d, history: %d, user: %d, products: %d, "
+        "instructions: %d | total: %d",
+        system_len,
+        history_len,
+        user_len,
+        products_len,
+        instructions_len,
+        system_len + history_len + user_len + products_len + instructions_len,
+    )
 
 
 def _format_final_instructions(language: str) -> str:

@@ -24,6 +24,8 @@ class ProductRepository:
         brand: str | None = None,
         category: str | None = None,
         combo_requested: bool | None = None,
+        min_price: int | None = None,
+        max_price: int | None = None,
         db_path: Path = DEFAULT_DB_PATH,
     ) -> list[dict[str, Any]]:
         """
@@ -37,6 +39,8 @@ class ProductRepository:
             brand=brand,
             category=category,
             combo_requested=combo_requested,
+            min_price=min_price,
+            max_price=max_price,
             db_path=db_path,
         )
 

@@ -136,10 +136,12 @@ def fetch_product_candidates(
     brand: str | None = None,
     category: str | None = None,
     combo_requested: bool | None = None,
+    min_price: int | None = None,
+    max_price: int | None = None,
     db_path: Path = DEFAULT_DB_PATH,
 ) -> list[dict[str, Any]]:
     """
-    Search products by token and optional budget.
+    Search products by token and optional filters.
 
     Matches:
     - name
@@ -186,6 +188,78 @@ def fetch_product_candidates(
         "show",
         "list",
         "all",
+        # Attribute/performance words — these describe desired qualities but
+        # rarely appear in product data; they should not restrict DB search.
+        "long",
+        "lasting",
+        "strong",
+        "powerful",
+        "intense",
+        "projection",
+        "beast",
+        "but",
+        "very",
+        # Recommendation/descriptive words — they describe product quality but
+        # should not restrict the database search to only products whose
+        # descriptions coincidentally contain these words.
+        "premium",
+        "luxury",
+        "signature",
+        "popular",
+        "best",
+        "top",
+        # Budget/value words — they describe desired price but should not
+        # restrict search to products whose names coincidentally contain these.
+        "cheap",
+        "cheapest",
+        "affordable",
+        "budget",
+        "value",
+        "economy",
+        "reasonable",
+        "discount",
+        # Occasion/scent/season words — they describe use-cases but rarely appear
+        # in product data; they should not restrict the database search.
+        "office",
+        "professional",
+        "formal",
+        "corporate",
+        "date",
+        "dating",
+        "romantic",
+        "dinner",
+        "party",
+        "club",
+        "nightclub",
+        "event",
+        "wedding",
+        "marriage",
+        "reception",
+        "casual",
+        "everyday",
+        "daily",
+        "regular",
+        "compliment",
+        "compliments",
+        "attention",
+        "sweet",
+        "fresh",
+        "woody",
+        "spicy",
+        "floral",
+        "vanilla",
+        "summer",
+        "winter",
+        "spring",
+        "autumn",
+        "rainy",
+        "monsoon",
+        "hot",
+        "cold",
+        "cool",
+        "warm",
+        "sunny",
+        "night",
     }
 
     # Remove stop words.
@@ -205,13 +279,15 @@ def fetch_product_candidates(
         and category is None
         and budget is None
         and gender is None
+        and min_price is None
+        and max_price is None
     ):
         return execute_query(
             """
             SELECT *
             FROM products
             ORDER BY price ASC
-            LIMIT 20
+            LIMIT 100
             """,
             db_path=db_path,
         )
@@ -280,6 +356,14 @@ def fetch_product_candidates(
             "OR LOWER(name) LIKE '%set%' "
             "OR LOWER(name) LIKE '%gift%')"
         )
+
+    if min_price is not None:
+        where_clauses.append("price >= ?")
+        params.append(min_price)
+
+    if max_price is not None:
+        where_clauses.append("price <= ?")
+        params.append(max_price)
 
     if budget is not None:
         where_clauses.append("price <= ?")

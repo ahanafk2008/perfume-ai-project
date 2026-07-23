@@ -32,18 +32,18 @@ def mock_ai_generator():
 
 # Mock conversation service
 @pytest.fixture
-def mock_conversation_service():
-    service = Mock()
-    return service
+def conversation_service():
+    from app.services.conversation import ConversationService
+    return ConversationService()
 
 @pytest.fixture
-def chat_service(mock_product_repo, mock_intent_detector, mock_search_service, mock_ai_generator, mock_conversation_service):
+def chat_service(mock_product_repo, mock_intent_detector, mock_search_service, mock_ai_generator, conversation_service):
     """Create a ChatService instance with mocked dependencies"""
     return ChatService(
         intent_service=mock_intent_detector,
         search_service=mock_search_service,
         ai_service=mock_ai_generator,
-        conversation_service=mock_conversation_service
+        conversation_service=conversation_service
     )
 
 def test_bangla_recommendation(chat_service, mock_product_repo):
@@ -294,3 +294,334 @@ def test_chat_service_with_real_data():
     # This test would run with actual services, but for now we're testing the mock structure
     
     assert True  # Placeholder to ensure file is valid
+
+
+def test_ai_does_not_claim_no_products_when_products_exist(chat_service):
+    """Regression: AI must not say no products when products are provided."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = [
+        {"name": "LATTAFA KHAMRA", "price": 2350, "category": "men"},
+        {"name": "CK ONE", "price": 2350, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some good options under ৳3,000:\n"
+        "1. LATTAFA KHAMRAH — ৳2350\n"
+        "2. CK ONE — ৳2350\n"
+    )
+
+    response = chat_service.process_message("best perfume under 3k")
+
+    assert response is not None
+    lowered = response.lower()
+    assert "no products" not in lowered
+    assert "couldn't find" not in lowered
+    assert "not available" not in lowered
+
+
+def test_ai_does_not_claim_no_products_with_many_products(chat_service):
+    """Regression: prompt truncation must not hide products from AI."""
+    from app.intent import Intent
+
+    products = [
+        {"name": "LATTAFA KHAMRA", "price": 2350, "category": "men"},
+        {"name": "BURBERRY HER", "price": 2800, "category": "women"},
+        {"name": "CK ONE", "price": 2350, "category": "men"},
+        {"name": "VERSACE EROS", "price": 3000, "category": "men"},
+        {"name": "ARMANI CODE", "price": 2900, "category": "men"},
+        {"name": "DIOR SAUVAGE", "price": 3200, "category": "men"},
+        {"name": "YARA", "price": 2100, "category": "women"},
+        {"name": "ASAD", "price": 1900, "category": "men"},
+    ]
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = products
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some good options under ৳3,000:\n"
+        "1. LATTAFA KHAMRA — ৳2350\n"
+        "2. CK ONE — ৳2350\n"
+    )
+
+    response = chat_service.process_message("best perfume under 3k")
+
+    assert response is not None
+    lowered = response.lower()
+    assert "no products" not in lowered
+    assert "couldn't find" not in lowered
+    assert "not available" not in lowered
+
+
+def test_followup_uses_previous_products(chat_service):
+    """Regression: follow-up questions should reuse previous products."""
+    from app.intent import Intent
+
+    # Turn 1: initial product search
+    chat_service.intent_service.detect.side_effect = [
+        Intent.PRODUCT_SEARCH,
+        Intent.PRODUCT_SEARCH,
+    ]
+    chat_service.search_service.search.return_value = [
+        {"name": "CREED AVENTUS", "price": 3500, "category": "men"},
+        {"name": "CK ONE", "price": 2350, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some men's perfumes you might like."
+    )
+
+    response1 = chat_service.process_message("show me men's perfumes")
+    assert response1 is not None
+    # Ensure search was called on turn 1
+    assert chat_service.search_service.search.call_count == 1
+
+    # Turn 2: follow-up should reuse previous products, not search again
+    chat_service.ai_service.generate_reply.return_value = (
+        "Based on the previous list, CK ONE typically lasts longer."
+    )
+    chat_service.search_service.search.reset_mock()
+
+    response2 = chat_service.process_message("which one lasts longer?")
+    assert response2 is not None
+    # The search should NOT have been called because products are reused from memory
+    chat_service.search_service.search.assert_not_called()
+
+
+def test_followup_buy_recommendation_uses_previous_products(chat_service):
+    """Regression: 'which one should I buy?' must recommend from previous products."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.side_effect = [
+        Intent.PRODUCT_SEARCH,
+        Intent.PRODUCT_SEARCH,
+    ]
+    chat_service.search_service.search.return_value = [
+        {"name": "CREED AVENTUS", "price": 3500, "category": "men"},
+        {"name": "CK ONE", "price": 2350, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some men's perfumes you might like."
+    )
+
+    response1 = chat_service.process_message("show me men's perfumes")
+    assert response1 is not None
+    assert chat_service.search_service.search.call_count == 1
+
+    chat_service.ai_service.generate_reply.return_value = (
+        "I'd recommend CK ONE for its broad appeal."
+    )
+    chat_service.search_service.search.reset_mock()
+
+    response2 = chat_service.process_message("which one should I buy?")
+    assert response2 is not None
+    chat_service.search_service.search.assert_not_called()
+
+
+def test_dior_brand_search_returns_no_unrelated_products(chat_service):
+    """Regression: asking for a brand that does not exist must not fall back to unrelated products."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = []
+    chat_service.ai_service.generate_reply.return_value = (
+        "I couldn't find any Dior products right now."
+    )
+
+    response = chat_service.process_message("do you have Dior perfumes?")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1
+    assert "Dior" in response or "couldn't find" in response
+
+
+def test_product_name_context_is_stored(chat_service):
+    """Regression: explicit product names should be captured for follow-up use."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_INFO
+    chat_service.search_service.search.return_value = [
+        {"name": "CLUB DE NUIT INTENSE MAN", "price": 2500, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "CLUB DE NUIT INTENSE MAN is a popular choice."
+    )
+
+    response = chat_service.process_message("Tell me about Club De Nuit Intense Man")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1
+    assert chat_service.conversation_service.get_last_product_name() == "CLUB DE NUIT INTENSE MAN"
+
+
+def test_followup_uses_stored_product_not_new_search(chat_service):
+    """Regression: follow-up questions must use stored product, not run a fresh search."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.side_effect = [
+        Intent.PRODUCT_INFO,
+        Intent.FOLLOW_UP,
+    ]
+    chat_service.search_service.search.return_value = [
+        {"name": "CLUB DE NUIT INTENSE MAN", "price": 2500, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "CLUB DE NUIT INTENSE MAN has great longevity."
+    )
+
+    response1 = chat_service.process_message("Tell me about Club De Nuit Intense Man")
+    assert response1 is not None
+    assert chat_service.search_service.search.call_count == 1
+
+    chat_service.ai_service.generate_reply.return_value = "It is known for long-lasting scent."
+    chat_service.search_service.search.reset_mock()
+
+    response2 = chat_service.process_message("what about this one?")
+    assert response2 is not None
+    chat_service.search_service.search.assert_not_called()
+
+
+def test_between_price_range_respected(chat_service):
+    """Regression: 'between 3000 and 5000' must strictly respect the price range."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = [
+        {"name": "P1", "price": 2000, "category": "men"},
+        {"name": "P2", "price": 3500, "category": "men"},
+        {"name": "P3", "price": 4500, "category": "men"},
+        {"name": "P4", "price": 6000, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some options in your range."
+    )
+
+    response = chat_service.process_message("show perfumes between 3000 and 5000")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1
+    returned_names = [
+        line.split(" | ")[0].strip()
+        for line in response.splitlines()
+        if line.startswith("P")
+    ]
+    assert "P2" in returned_names or "P3" in returned_names
+    assert "P1" not in returned_names
+    assert "P4" not in returned_names
+
+
+def test_office_perfume_semantic_mapping(chat_service):
+    """Regression: 'office perfume' should map to professional/fresh recommendation path."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = [
+        {"name": "Fresh Professional", "price": 2200, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some office-appropriate fresh perfumes."
+    )
+
+    response = chat_service.process_message("office perfume")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1
+
+
+# -----------------------------
+# New regression tests per task
+# -----------------------------
+
+def test_dior_brand_search_returns_empty_when_no_match(chat_service):
+    """Regression: asking for a brand that does not exist must not fall back to unrelated products."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = []
+    chat_service.ai_service.generate_reply.return_value = (
+        "I couldn't find any Dior products right now."
+    )
+
+    response = chat_service.process_message("do you have Dior perfumes?")
+    assert response is not None
+    # Search ran
+    assert chat_service.search_service.search.call_count == 1
+    # With empty products returned, response should not list unrelated perfumes
+    assert "Products found:" not in response
+
+
+def test_tell_about_product_stores_context(chat_service):
+    """Regression: 'Tell me about Club De Nuit Intense Man' stores product context."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_INFO
+    chat_service.search_service.search.return_value = [
+        {"name": "CLUB DE NUIT INTENSE MAN", "price": 2500, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "CLUB DE NUIT INTENSE MAN is a popular choice."
+    )
+
+    response = chat_service.process_message("Tell me about Club De Nuit Intense Man")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1
+    assert chat_service.conversation_service.get_last_product_name() == "CLUB DE NUIT INTENSE MAN"
+
+
+def test_what_is_price_uses_previous_product(chat_service):
+    """Regression: follow-up price questions should use stored product."""
+    from app.intent import Intent
+
+    # Turn 1
+    chat_service.intent_service.detect.side_effect = [
+        Intent.PRODUCT_INFO,
+        Intent.PRICE_QUERY,
+    ]
+    chat_service.search_service.search.return_value = [
+        {"name": "CLUB DE NUIT INTENSE MAN", "price": 2500, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "CLUB DE NUIT INTENSE MAN is a great choice."
+    )
+
+    response1 = chat_service.process_message("Tell me about Club De Nuit Intense Man")
+    assert response1 is not None
+    assert chat_service.search_service.search.call_count == 1
+
+    chat_service.ai_service.generate_reply.return_value = "It is 2500 BDT."
+    chat_service.search_service.search.reset_mock()
+
+    response2 = chat_service.process_message("what is the price?")
+    assert response2 is not None
+    chat_service.search_service.search.assert_not_called()
+    assert chat_service.conversation_service.get_last_product_name() == "CLUB DE NUIT INTENSE MAN"
+
+
+def test_between_range_respects_bounds(chat_service):
+    """Regression: 'between 3000 and 5000' must not include products outside the range."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = [
+        {"name": "P1", "price": 2000, "category": "men"},
+        {"name": "P2", "price": 3500, "category": "men"},
+        {"name": "P3", "price": 4500, "category": "men"},
+        {"name": "P4", "price": 6000, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = "Here are options in range."
+
+    response = chat_service.process_message("show perfumes between 3000 and 5000")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1
+    for forbidden in ("P1", "P4"):
+        assert forbidden not in response
+
+
+def test_office_perfume_uses_semantic_mapping(chat_service):
+    """Regression: 'office perfume' should trigger semantic recommendation mapping path."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
+    chat_service.search_service.search.return_value = [
+        {"name": "Fresh Professional", "price": 2200, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some office-appropriate fresh perfumes."
+    )
+
+    response = chat_service.process_message("office perfume")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1

@@ -4,7 +4,13 @@ from app.intent import Intent
 
 
 class ConversationService:
-    """Handles fixed conversation responses."""
+    """Handles fixed conversation responses and product context memory."""
+
+    def __init__(self):
+        self.last_product: dict | None = None
+        self.last_product_name: str | None = None
+        self.last_search_products: list[dict] = []
+        self.last_filters: dict = {}
 
     def handle(self, intent: Intent) -> str | None:
         """Return response if this intent is handled here."""
@@ -77,3 +83,34 @@ class ConversationService:
             )
 
         return None
+
+    def store_product_context(self, products: list[dict], query: str = ""):
+        """Store the last searched products and extract single product if available."""
+        if products:
+            self.last_search_products = products
+            # Store the first/most relevant product as the primary context
+            self.last_product = products[0] if products else None
+            self.last_product_name = self.last_product.get("name") if self.last_product else None
+        else:
+            self.last_search_products = []
+            self.last_product = None
+            self.last_product_name = None
+
+    def get_last_product(self) -> dict | None:
+        """Get the last mentioned product."""
+        return self.last_product
+
+    def get_last_product_name(self) -> str | None:
+        """Get the last mentioned product name."""
+        return self.last_product_name
+
+    def get_last_search_products(self) -> list[dict]:
+        """Get all products from the last search."""
+        return self.last_search_products
+
+    def clear_product_context(self):
+        """Clear stored product context."""
+        self.last_product = None
+        self.last_product_name = None
+        self.last_search_products = []
+        self.last_filters = {}
