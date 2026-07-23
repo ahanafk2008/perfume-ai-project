@@ -370,3 +370,64 @@ def test_detect_season():
     assert detect_season("office perfume") is None
     assert detect_season("best perfume") is None
 
+
+# -----------------------------
+# Bangla/Banglish occasion keywords
+# -----------------------------
+
+def test_detect_occasion_bangla():
+    from app.filters import detect_occasion
+    assert detect_occasion("অফিস পারফিউম") == "office"
+    assert detect_occasion("কাজের জন্য পারফিউম") == "office"
+    assert detect_occasion("biyer jonno perfume") == "wedding"
+    assert detect_occasion("বিয়ের পারফিউম") == "wedding"
+    assert detect_occasion("eid perfume") == "eid"
+    assert detect_occasion("ঈদের জন্য পারফিউম") == "eid"
+
+
+# -----------------------------
+# Product context follow-up (Bangla/Banglish)
+# -----------------------------
+
+def test_detect_original_kina():
+    from app.intent import detect_intent, Intent
+    assert detect_intent("Original kina?") == Intent.PRODUCT_INFO
+
+
+def test_detect_eta_original():
+    from app.intent import detect_intent, Intent
+    assert detect_intent("Eta original?") == Intent.PRODUCT_INFO
+
+
+def test_detect_eta_asal():
+    from app.intent import detect_intent, Intent
+    assert detect_intent("এটা আসল?") == Intent.PRODUCT_INFO
+
+
+# -----------------------------
+# FAQ delivery time / COD
+# -----------------------------
+
+def test_faq_delivery_time():
+    from app.faq import get_faq_answer
+    answer = get_faq_answer("delivery koto din?")
+    assert answer is not None
+    assert "delivery" in answer.lower() or "shipping" in answer.lower()
+
+
+def test_faq_cod():
+    from app.faq import get_faq_answer
+    answer = get_faq_answer("COD ache?")
+    assert answer is not None
+    assert "cod" in answer.lower() or "cash on delivery" in answer.lower()
+
+
+# -----------------------------
+# Gift keyword Bangla variants
+# -----------------------------
+
+def test_detect_gift_bangla():
+    from app.filters import detect_gift
+    assert detect_gift("ঈদের জন্য উপহার") is True
+    assert detect_gift("eid gift") is True
+

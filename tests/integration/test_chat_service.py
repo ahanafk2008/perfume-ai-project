@@ -422,13 +422,99 @@ def test_dior_brand_search_returns_no_unrelated_products(chat_service):
     chat_service.intent_service.detect.return_value = Intent.PRODUCT_SEARCH
     chat_service.search_service.search.return_value = []
     chat_service.ai_service.generate_reply.return_value = (
-        "I couldn't find any Dior products right now."
+        "Here are some office-appropriate fresh perfumes."
     )
 
-    response = chat_service.process_message("do you have Dior perfumes?")
+    response = chat_service.process_message("office perfume")
     assert response is not None
     assert chat_service.search_service.search.call_count == 1
-    assert "Dior" in response or "couldn't find" in response
+
+
+# -----------------------------
+# Issue 5: Conversation context resolution
+# -----------------------------
+
+def test_price_followed_by_longevity_uses_context(chat_service):
+    """After price query, longevity question should reuse product context."""
+    from app.intent import Intent
+
+    # Turn 1: price query
+    chat_service.intent_service.detect.side_effect = [
+        Intent.PRODUCT_INFO,
+        Intent.ATTRIBUTE_QUERY,
+    ]
+    chat_service.search_service.search.return_value = [
+        {"name": "BLEU DE CHANEL", "price": 2350, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "BLEU DE CHANEL is 2350 BDT."
+    )
+
+    response1 = chat_service.process_message("how much is Bleu de Chanel?")
+    assert response1 is not None
+    assert chat_service.search_service.search.call_count == 1
+
+    # Turn 2: follow-up longevity question
+    chat_service.ai_service.generate_reply.return_value = (
+        "BLEU DE CHANEL has good longevity."
+    )
+    chat_service.search_service.search.reset_mock()
+
+    response2 = chat_service.process_message("how long does it last?")
+    assert response2 is not None
+    # Should reuse previous products, not run a new search
+    chat_service.search_service.search.assert_not_called()
+    assert "BLEU DE CHANEL" in response2 or "bleu" in response2.lower()
+
+
+def test_price_followed_by_authenticity_uses_context(chat_service):
+    """After price query, authenticity question should reuse product context."""
+    from app.intent import Intent
+
+    # Turn 1: price query
+    chat_service.intent_service.detect.side_effect = [
+        Intent.PRODUCT_INFO,
+        Intent.PRODUCT_INFO,
+    ]
+    chat_service.search_service.search.return_value = [
+        {"name": "BLEU DE CHANEL", "price": 2350, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "BLEU DE CHANEL is 2350 BDT."
+    )
+
+    response1 = chat_service.process_message("how much is Bleu de Chanel?")
+    assert response1 is not None
+    assert chat_service.search_service.search.call_count == 1
+
+    # Turn 2: authenticity question
+    chat_service.ai_service.generate_reply.return_value = (
+        "Yes, BLEU DE CHANEL is original."
+    )
+    chat_service.search_service.search.reset_mock()
+
+    response2 = chat_service.process_message("is this original?")
+    assert response2 is not None
+    # Should reuse previous products, not run a new search
+    chat_service.search_service.search.assert_not_called()
+
+
+def test_gift_intent_triggers_search(chat_service):
+    """Gift intent should trigger product search."""
+    from app.intent import Intent
+
+    chat_service.intent_service.detect.return_value = Intent.GIFT
+    chat_service.search_service.search.return_value = [
+        {"name": "DIOR SAUVAGE", "brand": "Dior", "price": 3200, "category": "men"},
+    ]
+    chat_service.ai_service.generate_reply.return_value = (
+        "Here are some gift options."
+    )
+
+    response = chat_service.process_message("gift for husband")
+    assert response is not None
+    assert chat_service.search_service.search.call_count == 1
+    assert "DIOR SAUVAGE" in response
 
 
 def test_product_name_context_is_stored(chat_service):

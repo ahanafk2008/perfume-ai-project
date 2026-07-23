@@ -2,6 +2,7 @@
 
 import logging
 import re
+import string
 
 from app.faq import get_faq_answer
 from app.intent import Intent, contains_keyword, PRODUCT_KEYWORDS
@@ -176,8 +177,21 @@ class ChatService:
         if conversation_reply and isinstance(conversation_reply, str):
             return conversation_reply
 
-        # Keyword-only FAQ topics.
+        # If we have previous product context, skip FAQ for product-related follow-ups
+        # so "is this original?" after a product search gets context-aware answer
+        product_related_intents = {
+            Intent.PRODUCT_SEARCH,
+            Intent.PRODUCT_INFO,
+            Intent.PRICE_QUERY,
+            Intent.ATTRIBUTE_QUERY,
+            Intent.COMPARISON_QUERY,
+            Intent.GIFT,
+        }
+
         faq_answer = get_faq_answer(user_input)
+        if faq_answer and self.last_searched and self.last_products and intent in product_related_intents:
+            faq_answer = None
+
         if faq_answer:
             return f"\nAI:\n{faq_answer}"
 
@@ -192,6 +206,7 @@ class ChatService:
             Intent.COMPARISON_QUERY,
             Intent.ORDER,
             Intent.FOLLOW_UP,
+            Intent.GIFT,
         }
         # Broad follow-up keywords for conversational reuse.
         followup_keywords = {
@@ -226,11 +241,17 @@ class ChatService:
             "description",
             "details",
             "stock",
+            "kina",
+            "eta",
+            "আসল",
+            "এটা",
+            "কিনা",
         }
 
         normalized_input = user_input.strip().lower()
+        clean_input = normalized_input.rstrip(string.punctuation)
         intent_is_followup = intent in followup_product_intents
-        has_followup_keywords = contains_keyword(user_input, followup_keywords)
+        has_followup_keywords = contains_keyword(clean_input, followup_keywords) or contains_keyword(user_input, followup_keywords)
 
         # Reuse previous products when:
         # - intent is product-related
@@ -240,17 +261,7 @@ class ChatService:
             intent_is_followup
             and has_followup_keywords
             and self.last_searched
-            and self.last_products
-        )
-
-        logger.debug(
-            "Reuse check | intent=%s | intent_is_followup=%s | has_followup_keywords=%s | last_searched=%s | last_products=%d | reuse=%s",
-            intent,
-            intent_is_followup,
-            has_followup_keywords,
-            self.last_searched,
-            len(self.last_products),
-            reuse_previous_products,
+            and bool(self.last_products)
         )
 
         # Search products.
@@ -269,6 +280,7 @@ class ChatService:
                 Intent.ATTRIBUTE_QUERY,
                 Intent.COMPARISON_QUERY,
                 Intent.ORDER,
+                Intent.GIFT,
             )
 
             if intent in product_intents:
@@ -299,6 +311,7 @@ class ChatService:
                     Intent.ATTRIBUTE_QUERY,
                     Intent.COMPARISON_QUERY,
                     Intent.ORDER,
+                    Intent.GIFT,
                 }:
                     search_query = self._apply_semantic_mapping(user_input)
 
@@ -312,6 +325,17 @@ class ChatService:
                 )
 
                 logger.debug("Found %d products", len(products))
+
+        # Inject previous product context for "this"/"it"/"this perfume" references
+        _pronoun_words = {"this", "it", "that"}
+        has_pronoun_ref = any(w in user_input.lower().split() for w in _pronoun_words)
+        prev_prod = self.conversation_service.get_last_product()
+        prev_name = prev_prod.get("name", "") if prev_prod else ""
+        if has_pronoun_ref and prev_name:
+            if not products:
+                products = [prev_prod]
+                searched = True
+            user_input = f"{user_input} (referring to {prev_name})"
 
         # Generate AI response
         ai_output = self.ai_service.generate_reply(

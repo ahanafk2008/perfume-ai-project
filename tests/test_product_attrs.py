@@ -98,6 +98,63 @@ def test_format_product_attributes_formats_all_fields():
     assert "Best for: office" in result
 
 
+# -----------------------------
+# Structured fragrance tags (scent_family, occasion, performance)
+# -----------------------------
+
+def test_get_attributes_includes_scent_family():
+    """get_product_attributes should include scent_family when present."""
+    product = {"data": json.dumps({"fragrance_details": {"scent_family": ["sweet", "vanilla"]}})}
+    attrs = get_product_attributes(product)
+    assert attrs["scent_family"] == ["sweet", "vanilla"]
+
+
+def test_get_attributes_includes_occasion():
+    """get_product_attributes should include occasion when present."""
+    product = {"data": json.dumps({"fragrance_details": {"occasion": ["office", "date"]}})}
+    attrs = get_product_attributes(product)
+    assert attrs["occasion"] == ["office", "date"]
+
+
+def test_get_attributes_includes_performance():
+    """get_product_attributes should include performance when present."""
+    product = {"data": json.dumps({"fragrance_details": {"performance": ["strong", "long lasting"]}})}
+    attrs = get_product_attributes(product)
+    assert attrs["performance"] == ["strong", "long lasting"]
+
+
+def test_get_attributes_returns_none_for_missing_tags():
+    """get_product_attributes should return None for missing structured fields."""
+    attrs = get_product_attributes({"data": '{"fragrance_details": {}}'})
+    assert attrs["scent_family"] is None
+    assert attrs["occasion"] is None
+    assert attrs["performance"] is None
+
+
+def test_format_product_attributes_includes_scent_family():
+    """format_product_attributes should include scent_family when present."""
+    product = {"data": json.dumps({"fragrance_details": {"scent_family": ["sweet", "vanilla"]}})}
+    result = format_product_attributes(product)
+    assert result is not None
+    assert "Scent: sweet, vanilla" in result
+
+
+def test_format_product_attributes_includes_occasion():
+    """format_product_attributes should include occasion when present."""
+    product = {"data": json.dumps({"fragrance_details": {"occasion": ["office", "party"]}})}
+    result = format_product_attributes(product)
+    assert result is not None
+    assert "Occasion: office, party" in result
+
+
+def test_format_product_attributes_includes_performance():
+    """format_product_attributes should include performance when present."""
+    product = {"data": json.dumps({"fragrance_details": {"performance": ["long lasting"]}})}
+    result = format_product_attributes(product)
+    assert result is not None
+    assert "Performance: long lasting" in result
+
+
 def test_format_product_attributes_includes_notes():
     """Notes should be formatted as Top/Middle/Base sections."""
     product = {
@@ -500,4 +557,36 @@ def test_occasion_matches_best_time():
     assert _matches_occasion(product_with_best_time, "office") is True
     assert _matches_occasion(product_no_data, "office") is False
     assert _matches_occasion(product_no_data, None) is False
+
+
+def test_matches_scent_from_ranking():
+    from app.ranking import _matches_scent
+
+    product = {
+        "data": json.dumps({
+            "fragrance_details": {
+                "scent_family": ["sweet", "vanilla"]
+            }
+        })
+    }
+
+    assert _matches_scent(product, "sweet") is True
+    assert _matches_scent(product, "fresh") is False
+    assert _matches_scent(product, None) is False
+
+
+def test_matches_performance_from_ranking():
+    from app.ranking import _matches_performance
+
+    product = {
+        "data": json.dumps({
+            "fragrance_details": {
+                "performance": ["long lasting"]
+            }
+        })
+    }
+
+    assert _matches_performance(product, "long lasting") is True
+    assert _matches_performance(product, "strong") is False
+    assert _matches_performance(product, None) is False
 

@@ -32,6 +32,10 @@ class Intent(str, Enum):
 
     FOLLOW_UP = "follow_up"
 
+    GIFT = "gift"
+    LUXURY = "luxury"
+    COMPLIMENT = "compliment"
+
     UNKNOWN = "unknown"
 
 
@@ -185,6 +189,45 @@ ORDER_KEYWORDS = {
 }
 
 # -----------------------------
+# Gift
+# -----------------------------
+
+GIFT_KEYWORDS = {
+    "gift",
+    "gifts",
+    "present",
+    "presents",
+    "birthday",
+    "anniversary",
+    "valentine",
+    "for her",
+    "for him",
+    "for wife",
+    "for husband",
+    "for girlfriend",
+    "for boyfriend",
+    "for mom",
+    "for dad",
+    "for mother",
+    "for father",
+    "for sister",
+    "for brother",
+    "wife",
+    "husband",
+    "girlfriend",
+    "boyfriend",
+    "mom",
+    "dad",
+    "উপহার",
+    "eid",
+    "ঈদ",
+    "সারপ্রাইজ",
+    "surprise",
+    "বিয়ে",
+    "biye",
+}
+
+# -----------------------------
 # Product Search
 # -----------------------------
 
@@ -289,6 +332,12 @@ PRODUCT_INFO_KEYWORDS = {
     "weight of",
     "stock",
     "available",
+    "original kina",
+    "eta original",
+    "kina",
+    "আসল",
+    "এটা আসল",
+    "এটা অরিজিনাল",
 }
 
 PRICE_QUERY_KEYWORDS = {
@@ -324,6 +373,10 @@ ATTRIBUTE_QUERY_KEYWORDS = {
     "ml",
     "volume",
     "weight",
+    "kina",
+    "আসল",
+    "অরিজিনাল",
+    "eta",
 }
 
 COMPARISON_QUERY_KEYWORDS = {
@@ -425,6 +478,7 @@ def detect_intent(
 ) -> Intent:
     """Detect the user's intent."""
 
+    raw_message = message.strip().lower()
     message = normalize(message)
 
     result = Intent.UNKNOWN
@@ -480,6 +534,16 @@ def detect_intent(
 
     elif contains_keyword(message, COMPARISON_QUERY_KEYWORDS):
         result = Intent.COMPARISON_QUERY
+
+    # -----------------------------
+    # Gift intent (must be before generic PRODUCT_SEARCH and UNKNOWN)
+    # -----------------------------
+
+    elif contains_keyword(message, GIFT_KEYWORDS):
+        result = Intent.GIFT
+
+    elif contains_keyword(raw_message, GIFT_KEYWORDS):
+        result = Intent.GIFT
 
     # -----------------------------
     # Product Search

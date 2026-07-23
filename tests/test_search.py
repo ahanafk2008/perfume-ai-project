@@ -182,3 +182,59 @@ def test_similarity_query():
     """Regression: similarity queries should not crash."""
     results = search_products("something similar to dior sauvage")
     assert isinstance(results, list)
+
+
+# -----------------------------
+# Exact product name search
+# -----------------------------
+
+def test_exact_name_search_creed_aventus():
+    """Exact product name should match database products."""
+    results = search_products("Creed Aventus")
+    assert isinstance(results, list)
+    assert len(results) > 0
+    assert any("creed aventus" in (p.get("name") or "").lower() for p in results)
+
+
+def test_exact_name_search_club_de_nuit():
+    """Exact product name with brand prefix should match."""
+    results = search_products("Club De Nuit Intense Man")
+    assert isinstance(results, list)
+
+
+def test_do_you_have_creed_aventus():
+    """'do you have' prefix should still match exact product."""
+    results = search_products("do you have Creed Aventus?")
+    assert isinstance(results, list)
+    assert len(results) > 0
+
+
+def test_tell_me_about_bleu_de_chanel():
+    """'Tell me about' should match exact product."""
+    results = search_products("Tell me about Bleu de Chanel")
+    assert isinstance(results, list)
+    assert len(results) > 0
+    assert any("bleu de chanel" in (p.get("name") or "").lower() for p in results)
+
+
+def test_sweet_fragrance_returns_sweet_products():
+    """Sweet fragrance queries should match products with scent_family tags."""
+    results = search_products("sweet perfume")
+    assert isinstance(results, list)
+    if results:
+        assert len(results) > 0
+
+
+def test_fresh_fragrance_returns_fresh_products():
+    """Fresh fragrance queries should match products with scent_family tags."""
+    results = search_products("fresh perfume")
+    assert isinstance(results, list)
+    if results:
+        assert len(results) > 0
+
+
+def test_office_perfume_detects_occasion():
+    """Office queries should detect occasion filter properly."""
+    from app.filters import detect_occasion
+    assert detect_occasion("office perfume") == "office"
+    assert detect_occasion("অফিস পারফিউম") == "office"

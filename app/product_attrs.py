@@ -36,6 +36,9 @@ def get_product_attributes(product: dict[str, Any]) -> dict[str, Any]:
         "notes_top": (notes_obj.get("top") or None) if isinstance(notes_obj, dict) else None,
         "notes_middle": (notes_obj.get("middle") or None) if isinstance(notes_obj, dict) else None,
         "notes_base": (notes_obj.get("base") or None) if isinstance(notes_obj, dict) else None,
+        "scent_family": fd.get("scent_family") or None,
+        "occasion": fd.get("occasion") or None,
+        "performance": fd.get("performance") or None,
     }
 
 
@@ -78,6 +81,18 @@ def format_product_attributes(product: dict[str, Any]) -> str | None:
     bt = (fd.get("bestTime") or "").strip()
     if bt:
         parts.append(f"Best for: {bt}")
+
+    sf = fd.get("scent_family")
+    if sf and isinstance(sf, list) and sf:
+        parts.append(f"Scent: {', '.join(sf)}")
+
+    oc = fd.get("occasion")
+    if oc and isinstance(oc, list) and oc:
+        parts.append(f"Occasion: {', '.join(oc)}")
+
+    pf = fd.get("performance")
+    if pf and isinstance(pf, list) and pf:
+        parts.append(f"Performance: {', '.join(pf)}")
 
     notes_str = _format_notes(product)
     if notes_str:

@@ -646,6 +646,8 @@ def detect_occasion(query: str) -> str | None:
         "formal": "office",
         "corporate": "office",
         "office wear": "office",
+        "কাজ": "office",
+        "অফিস": "office",
 
         "date": "date",
         "dating": "date",
@@ -662,12 +664,19 @@ def detect_occasion(query: str) -> str | None:
         "marriage": "wedding",
         "reception": "wedding",
         "function": "wedding",
+        "biye": "wedding",
+        "biyer": "wedding",
+        "biya": "wedding",
+        "বিয়ে": "wedding",
 
         "casual": "casual",
         "everyday": "casual",
         "daily": "casual",
         "everyday wear": "casual",
         "regular": "casual",
+
+        "eid": "eid",
+        "ঈদ": "eid",
     }
 
     q = normalize(query)
@@ -858,6 +867,17 @@ GIFT_WORDS: set[str] = {
     "for girlfriend",
     "for boyfriend",
     "উপহার",
+    "স surprise",
+    "সারপ্রাইজ",
+    "সরপ্রাইজ",
+    "shurprise",
+    "surprise",
+    "eid",
+    "eid gift",
+    "ঈদ",
+    "ঈদের উপহার",
+    "বিয়ের উপহার",
+    "biyer upohar",
 }
 
 
@@ -891,6 +911,28 @@ def detect_cheap_intent(query: str) -> bool:
     q = normalize(query)
     cheap_words = {"cheap", "cheapest", "affordable", "budget", "value", "economy", "reasonable", "discount"}
     return any(w in q for w in cheap_words)
+
+
+COMPLIMENT_WORDS: set[str] = {
+    "compliment",
+    "compliments",
+    "gets compliments",
+    "attract",
+    "attention",
+    "get compliments",
+    "compliment getter",
+    "people notice",
+    "turn heads",
+}
+
+
+def detect_compliment(query: str) -> bool:
+    """Detect whether the query asks for compliment-getting perfumes."""
+    q = normalize(query)
+    for word in COMPLIMENT_WORDS:
+        if word in q:
+            return True
+    return False
 
 
 SEASON_WORDS: dict[str, str] = {
@@ -937,5 +979,6 @@ def extract_structured_filters(query: str) -> dict[str, Any]:
         "luxury": detect_luxury(query),
         "gift": detect_gift(query),
         "cheap_intent": detect_cheap_intent(query),
+        "compliment": detect_compliment(query),
         "sort": detect_sort(query),
     }

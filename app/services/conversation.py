@@ -44,13 +44,13 @@ class ConversationService:
             )
 
         if intent == Intent.DELIVERY:
-            return "\nAI:\nYes, we provide delivery service."
+            return "\nAI:\nDelivery typically takes 2-4 business days within Bangladesh. Please contact Scent Of Time for specific delivery timeframes."
 
         if intent == Intent.PAYMENT:
             return (
                 "\nAI:\n"
-                "We accept available payment methods. "
-                "Please contact Scent Of Time for payment details."
+                "We accept Cash on Delivery (COD) and other available payment methods. "
+                "Please contact Scent Of Time to confirm COD availability in your area."
             )
 
         if intent == Intent.LOCATION:

@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 try:
+    from .database import execute_query
     from .repositories.product_repository import ProductRepository
     from .filters import (
         extract_budget,
@@ -26,6 +27,7 @@ try:
     from .ranking import rank_products
 
 except ImportError:  # pragma: no cover
+    from database import execute_query
     from repositories.product_repository import ProductRepository
     from filters import (
         extract_budget,
@@ -43,6 +45,58 @@ logger = logging.getLogger(__name__)
 
 
 MAX_SEARCH_TOKENS = 15
+
+
+def _normalize_search_name(text: str) -> str:
+    """Normalize text for exact name comparison."""
+    text = re.sub(r"[^\w\s]", "", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _exact_name_search(query: str) -> dict[str, Any] | None:
+    """Try to find a product by exact normalized name match.
+
+    Strips common question words, searches name and name+brand columns.
+    """
+    q = _normalize_search_name(query)
+    if not q:
+        return None
+
+    # Strip leading question/request words
+    for prefix in ("do you have ", "tell me about ", "i want ", "show me ", "what about "):
+        if q.startswith(prefix):
+            q = q[len(prefix):]
+            break
+
+    # Search by exact normalized name match
+    rows = execute_query(
+        """
+        SELECT * FROM products
+        WHERE LOWER(REPLACE(REPLACE(REPLACE(name, '|', ''), '-', ' '), '.', '')) = ?
+        OR LOWER(REPLACE(REPLACE(REPLACE(name || ' ' || brand, '|', ''), '-', ' '), '.', '')) = ?
+        LIMIT 1
+        """,
+        (q, q),
+    )
+    if rows:
+        return rows[0]
+
+    # Fallback: search for the query as a substring of product name
+    rows = execute_query(
+        """
+        SELECT * FROM products
+        WHERE LOWER(name) LIKE ?
+        LIMIT 1
+        """,
+        (f"%{q}%",),
+    )
+    if rows:
+        # Verify the normalized forms match well
+        pname = _normalize_search_name(rows[0]["name"])
+        if q in pname or pname in q:
+            return rows[0]
+
+    return None
 
 
 def search_products(
@@ -122,8 +176,13 @@ def search_products(
     )
 
 
-    # Database search
-    candidates = ProductRepository.search_candidates(
+    # Exact product name search (before fuzzy token search)
+    exact_match = _exact_name_search(query)
+    if exact_match:
+        logger.debug("Exact product name match found: %s", exact_match.get("name"))
+        candidates = [exact_match]
+    else:
+        candidates = ProductRepository.search_candidates(
         query=query,
         tokens=tokens,
         budget=budget,
@@ -164,6 +223,7 @@ def search_products(
     luxury = structured_filters.get("luxury", False)
     gift = structured_filters.get("gift", False)
     cheap_intent = structured_filters.get("cheap_intent", False)
+    compliment = structured_filters.get("compliment", False)
     ranked = rank_products(
         candidates,
         query,
@@ -177,6 +237,7 @@ def search_products(
         luxury=luxury,
         gift=gift,
         cheap_intent=cheap_intent,
+        compliment=compliment,
     )
 
     # Post-ranking budget enforcement: budget extracted from query must be

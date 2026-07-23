@@ -141,6 +141,42 @@ def test_product_followup():
 
 
 # -----------------------------
+# Gift Intent (must be detected before UNKNOWN)
+# -----------------------------
+
+def test_gift_intent_husband():
+    assert detect_intent("suggest a gift for my husband") == Intent.GIFT
+    assert detect_intent("gift for husband") == Intent.GIFT
+    assert detect_intent("something for my husband") == Intent.GIFT
+
+
+def test_gift_intent_wife():
+    assert detect_intent("gift for wife") == Intent.GIFT
+    assert detect_intent("present for my wife") == Intent.GIFT
+
+
+def test_gift_intent_girlfriend():
+    assert detect_intent("perfume for my girlfriend birthday") == Intent.GIFT
+    assert detect_intent("gift for girlfriend") == Intent.GIFT
+
+
+def test_gift_intent_boyfriend():
+    assert detect_intent("something for my boyfriend") == Intent.GIFT
+    assert detect_intent("birthday gift for boyfriend") == Intent.GIFT
+
+
+def test_gift_intent_generic():
+    assert detect_intent("gift") == Intent.GIFT
+    assert detect_intent("valentine gift") == Intent.GIFT
+    assert detect_intent("anniversary present") == Intent.GIFT
+
+
+def test_gift_intent_not_confused_with_product_search():
+    """Gift must take priority over generic product_search for ambiguous queries."""
+    assert detect_intent("gift for husband") == Intent.GIFT
+
+
+# -----------------------------
 # Unknown
 # -----------------------------
 

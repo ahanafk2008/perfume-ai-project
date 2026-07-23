@@ -23,8 +23,8 @@ MAX_PROMPT_PRODUCTS = 5
 
 LANGUAGE_INSTRUCTIONS: dict[str, str] = {
     "en": "Respond only in English.",
-    "bn": "Respond only in Bangla.",
-    "bn-en": "Respond naturally in Banglish.",
+    "bn": "Respond only in Bangla (Bengali). Use natural, conversational Bangla — prefer common words like পারফিউম, দাম, আছে, চান, ভালো over formal/sanskritized alternatives.",
+    "bn-en": "Respond naturally in Banglish (mixed Bengali and English). Use common spoken forms like 'eta', 'ache', 'dam', 'valo'. Avoid formal Bangla.",
 }
 
 FINAL_RESPONSE_RULES: tuple[str, ...] = (

@@ -41,6 +41,7 @@ BUDGET_WEIGHT = 20
 
 COMBO_MATCH_WEIGHT = 10
 UNREQUESTED_COMBO_PENALTY = -999
+LUXURY_COMBO_PENALTY = -9999
 
 # Strong penalty for wrong gender
 WRONG_GENDER_PENALTY = -100
@@ -75,6 +76,11 @@ CHEAP_SORT_WEIGHT = 30
 
 # Gift intent boost
 GIFT_WEIGHT = 25
+
+# Compliment intent boost
+COMPLIMENT_PREMIUM_BOOST = 30
+COMPLIMENT_PERFORMANCE_BOOST = 20
+COMPLIMENT_POPULAR_BOOST = 15
 
 # Designer, niche, and premium brands (subset of KNOWN_BRANDS with higher reputation).
 # These get a scoring boost when the user asks for "best", "top", "premium", etc.
@@ -151,6 +157,12 @@ def _text(value: Any) -> str:
     return str(value or "").lower().strip()
 
 
+def _normalize_for_exact_match(text: str) -> str:
+    """Normalize text for exact comparison: lowercase, collapse spaces, remove punctuation."""
+    text = re.sub(r"[^\w\s]", "", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _tokenize(text: str) -> set[str]:
     """Split normalized text into a set of lowercase word tokens."""
 
@@ -182,14 +194,19 @@ def _matches_occasion(
     product: Mapping[str, Any],
     occasion: str | None,
 ) -> bool:
-    """Check whether product data matches requested occasion (via bestTime field)."""
+    """Check whether product data matches requested occasion."""
     if not occasion:
         return False
     attrs = get_product_attributes(product)
     best_time = _text(attrs.get("best_time") or "")
-    if not best_time:
-        return False
-    return occasion.lower() in best_time
+    occasion_list = attrs.get("occasion")
+    if best_time and occasion.lower() in best_time:
+        return True
+    if occasion_list and isinstance(occasion_list, list):
+        for o in occasion_list:
+            if occasion.lower() == o.lower():
+                return True
+    return False
 
 
 def _matches_scent(
@@ -200,11 +217,20 @@ def _matches_scent(
 
     Matches against known scent-category keywords (e.g. 'floral' matches
     'rose', 'jasmine') so users can ask for 'floral perfume' and get
-    products with floral notes.
+    products with floral notes. Also checks scent_family field.
     """
     if not scent:
         return False
     attrs = get_product_attributes(product)
+
+    # Check scent_family field first
+    scent_family = attrs.get("scent_family")
+    if scent_family and isinstance(scent_family, list):
+        for sf in scent_family:
+            if scent.lower() == sf.lower():
+                return True
+
+    # Fallback to notes-based matching
     all_notes = []
     for key in ("notes_top", "notes_middle", "notes_base"):
         notes = attrs.get(key)
@@ -239,6 +265,16 @@ def _matches_performance(
     if not performance:
         return False
     attrs = get_product_attributes(product)
+
+    # Check performance field first
+    perf_list = attrs.get("performance")
+    if perf_list and isinstance(perf_list, list):
+        for p in perf_list:
+            p_norm = p.lower().replace("-", "").replace("_", "").replace(" ", "")
+            perf_norm = performance.lower().replace("-", "").replace("_", "").replace(" ", "")
+            if perf_norm == p_norm or perf_norm in p_norm or p_norm in perf_norm:
+                return True
+
     longevity = _text(attrs.get("longevity") or "")
     sillage = _text(attrs.get("sillage") or "")
 
@@ -249,6 +285,12 @@ def _matches_performance(
     if performance == "projection":
         return bool(sillage)
     if performance == "compliment":
+        desc = _text(product.get("description"))
+        pop_kws = {"popular", "compliment", "best seller", "signature", "attention"}
+        if any(kw in desc for kw in pop_kws):
+            return True
+        if perf_list:
+            return True
         return False
     perf_text = " ".join([longevity, sillage])
     return performance.lower() in perf_text
@@ -491,6 +533,7 @@ def calculate_score(
     luxury: bool = False,
     gift: bool = False,
     cheap_intent: bool = False,
+    compliment: bool = False,
     max_price_in_results: float = 1.0,
 ) -> int:
     """Calculate product relevance score."""
@@ -512,7 +555,7 @@ def calculate_score(
     product_category = _text(product.get("category"))
     product_text = _product_text(product)
 
-    # Exact product name matching
+    # Exact product name matching (with brand stripping)
     if product_name and query_text:
         query_words = query_text.split()
 
@@ -520,6 +563,18 @@ def calculate_score(
             score += EXACT_NAME_WEIGHT
         elif len(query_words) > 1 and f" {query_text} " in f" {product_name} ":
             score += int(EXACT_NAME_WEIGHT * 0.8)
+
+        # Normalized exact match: strip punctuation, collapse spaces
+        norm_query = _normalize_for_exact_match(query_text)
+        norm_pname = _normalize_for_exact_match(product_name)
+        if norm_pname == norm_query:
+            score += EXACT_NAME_WEIGHT
+
+        # Combined name+brand match
+        combined = f"{product_name} {product_brand}"
+        norm_combined = _normalize_for_exact_match(combined)
+        if norm_combined == norm_query:
+            score += EXACT_NAME_WEIGHT
 
     # Brand match
     if brand and brand.lower() in product_brand:
@@ -551,7 +606,8 @@ def calculate_score(
     if combo_requested and is_combo:
         score += COMBO_MATCH_WEIGHT
     elif not combo_requested and is_combo:
-        score += UNREQUESTED_COMBO_PENALTY
+        penalty = LUXURY_COMBO_PENALTY if luxury else UNREQUESTED_COMBO_PENALTY
+        score += penalty
 
     # Metadata-based matching (boost if actual metadata exists)
     if _matches_occasion(product, occasion):
@@ -597,6 +653,19 @@ def calculate_score(
     # Cheap intent (no specific budget): reward lower-priced products
     if cheap_intent:
         score += _cheap_sort_boost(product, cheap_intent, max_price_in_results)
+
+    # Compliment intent: boost premium brands + performance + popular products
+    if compliment:
+        product_brand_lower = _text(product.get("brand"))
+        for brand_name in PREMIUM_BRANDS:
+            if brand_name in product_brand_lower:
+                score += COMPLIMENT_PREMIUM_BOOST
+                break
+        desc = _text(product.get("description"))
+        perf_kws = {"long lasting", "strong", "powerful", "intense", "beast", "popular", "best seller"}
+        if any(kw in desc for kw in perf_kws):
+            score += COMPLIMENT_PERFORMANCE_BOOST
+        score += _premium_brand_boost(product, True)
 
     # Field-aware keyword relevance
     score += _keyword_score(product, tokens)
@@ -654,6 +723,7 @@ def rank_products(
     luxury: bool = False,
     gift: bool = False,
     cheap_intent: bool = False,
+    compliment: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Rank and return the best matching products.
@@ -718,6 +788,11 @@ def rank_products(
         if cheap_intent is not None
         else __import__("app.filters", fromlist=["detect_cheap_intent"]).detect_cheap_intent(query)
     )
+    compliment = (
+        compliment
+        if compliment is not None
+        else __import__("app.filters", fromlist=["detect_compliment"]).detect_compliment(query)
+    )
 
     # Compute max price for cheap sort normalization
     prices = []
@@ -749,6 +824,7 @@ def rank_products(
             luxury=luxury,
             gift=gift,
             cheap_intent=cheap_intent,
+            compliment=compliment,
             max_price_in_results=max_price_in_results,
         )
 

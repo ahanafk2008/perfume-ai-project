@@ -1,3 +1,5 @@
+import json
+
 from app.ranking import calculate_score, rank_products
 
 
@@ -717,3 +719,261 @@ def test_performance_matching_from_fragrance_details():
 
     assert _matches_performance(product_with_data, "longlasting") is True
     assert _matches_performance(product_no_data, "longlasting") is False
+
+
+# -----------------------------
+# Exact name matching with brand stripping
+# -----------------------------
+
+def test_exact_name_match_normalized():
+    """Exact name match should work with normalized comparison."""
+    from app.ranking import _normalize_for_exact_match
+    assert _normalize_for_exact_match("Creed Aventus") == "creed aventus"
+    assert _normalize_for_exact_match("CREED AVENTUS | CREED") == "creed aventus creed"
+    assert _normalize_for_exact_match("Club De Nuit Intense Man") == "club de nuit intense man"
+
+
+def test_exact_name_scores_higher_with_normalized():
+    """Product should get exact match score via normalized comparison."""
+    product = {
+        "id": "180",
+        "name": "CREED AVENTUS | CREED",
+        "brand": "Creed",
+        "category": "Men",
+        "description": "",
+        "price": 800,
+    }
+    score = calculate_score(product, "Creed Aventus")
+    assert score >= 100, "Exact normalized match should get full weight"
+
+
+def test_exact_name_matches_combined_name_brand():
+    """Query that matches name+brand combo should get exact match boost."""
+    product = {
+        "id": "181",
+        "name": "BLEU DE CHANEL",
+        "brand": "CHANEL",
+        "category": "Men",
+        "description": "",
+        "price": 2350,
+    }
+    score = calculate_score(product, "bleu de chanel")
+    assert score >= 100
+
+
+# -----------------------------
+# Luxury query: strong combo penalty
+# -----------------------------
+
+def test_luxury_combo_penalty_stronger():
+    """Luxury queries should apply much stronger combo penalty."""
+    combo = {
+        "id": "190",
+        "name": "Cheap Combo Set",
+        "brand": "Unknown",
+        "category": "Combo",
+        "description": "Combo pack",
+        "price": 500,
+    }
+    regular = {
+        "id": "191",
+        "name": "Premium Scent",
+        "brand": "Dior",
+        "category": "Men",
+        "description": "",
+        "price": 2000,
+    }
+
+    ranked = rank_products(
+        [combo, regular],
+        "luxury perfume",
+        luxury=True,
+        combo_requested=False,
+    )
+
+    assert ranked[0]["id"] == "191", "Regular premium should outrank combo for luxury query"
+    assert ranked[0]["id"] != "190", "Combo should never rank first for luxury"
+
+
+def test_luxury_combo_penalty_more_than_normal():
+    """Luxury combo penalty should be more severe than normal combo penalty."""
+    from app.ranking import calculate_score
+
+    combo = {
+        "id": "192",
+        "name": "Combo Set",
+        "brand": "Unknown",
+        "category": "Combo",
+        "description": "",
+        "price": 500,
+    }
+
+    normal_penalty = calculate_score(combo, "perfume", luxury=False, combo_requested=False)
+    luxury_penalty = calculate_score(combo, "luxury perfume", luxury=True, combo_requested=False)
+
+    assert luxury_penalty < normal_penalty, "Luxury combo penalty should be more negative than normal"
+
+
+# -----------------------------
+# Compliment intent detection and ranking
+# -----------------------------
+
+def test_detect_compliment():
+    """Compliment intent should be detected correctly."""
+    from app.filters import detect_compliment
+    assert detect_compliment("perfume that gets compliments") is True
+    assert detect_compliment("compliment perfume") is True
+    assert detect_compliment("what perfume gets compliments") is True
+    assert detect_compliment("best perfume") is False
+
+
+def test_compliment_boosts_premium_brands():
+    """Compliment queries should boost premium brands."""
+    premium = {
+        "id": "200",
+        "name": "Sauvage",
+        "brand": "Dior",
+        "category": "Men",
+        "description": "",
+        "price": 3000,
+    }
+    cheap = {
+        "id": "201",
+        "name": "Budget Scent",
+        "brand": "Unknown",
+        "category": "Men",
+        "description": "",
+        "price": 500,
+    }
+
+    ranked = rank_products(
+        [cheap, premium],
+        "perfume that gets compliments",
+        compliment=True,
+    )
+
+    assert ranked[0]["id"] == "200", "Premium brand should rank first for compliment query"
+
+
+def test_compliment_boosts_popular_description():
+    """Compliment queries should boost products with popular/performance keywords."""
+    popular = {
+        "id": "210",
+        "name": "Popular Scent",
+        "brand": "Lattafa",
+        "category": "Men",
+        "description": "Our most popular long lasting perfume that gets compliments",
+        "price": 1500,
+    }
+    plain = {
+        "id": "211",
+        "name": "Plain Scent",
+        "brand": "Lattafa",
+        "category": "Men",
+        "description": "Light fresh perfume",
+        "price": 800,
+    }
+
+    ranked = rank_products(
+        [plain, popular],
+        "perfume that gets compliments",
+        compliment=True,
+    )
+
+    assert ranked[0]["id"] == "210", "Product with popular/long lasting description should rank first for compliment"
+
+
+# -----------------------------
+# Scent family matching from fragrance_details
+# -----------------------------
+
+def test_scent_family_matches():
+    """Scent matching should work with scent_family field."""
+    from app.ranking import _matches_scent
+
+    product_with_scent_family = {
+        "id": "220",
+        "name": "Sweet Vanilla",
+        "brand": "Test",
+        "category": "Women",
+        "description": "",
+        "price": 1000,
+        "data": json.dumps({
+            "fragrance_details": {
+                "scent_family": ["sweet", "vanilla"],
+            },
+        }),
+    }
+    product_no_scent = {
+        "id": "221",
+        "name": "Plain",
+        "brand": "Test",
+        "category": "Men",
+        "description": "",
+        "price": 800,
+        "data": '{}',
+    }
+
+    assert _matches_scent(product_with_scent_family, "sweet") is True
+    assert _matches_scent(product_with_scent_family, "vanilla") is True
+    assert _matches_scent(product_no_scent, "sweet") is False
+
+
+def test_occasion_matches_via_occasion_field():
+    """Occasion matching should work with occasion field."""
+    from app.ranking import _matches_occasion
+
+    product = {
+        "id": "230",
+        "name": "Office Scent",
+        "brand": "Test",
+        "category": "Men",
+        "description": "",
+        "price": 1000,
+        "data": json.dumps({
+            "fragrance_details": {"occasion": ["office", "party"]},
+        }),
+    }
+    product_no_occasion = {
+        "id": "231",
+        "name": "Plain",
+        "brand": "Test",
+        "category": "Men",
+        "description": "",
+        "price": 800,
+        "data": '{}',
+    }
+
+    assert _matches_occasion(product, "office") is True
+    assert _matches_occasion(product, "party") is True
+    assert _matches_occasion(product_no_occasion, "office") is False
+
+
+def test_performance_matches_via_performance_field():
+    """Performance matching should work with performance field."""
+    from app.ranking import _matches_performance
+
+    product = {
+        "id": "240",
+        "name": "Strong Scent",
+        "brand": "Test",
+        "category": "Men",
+        "description": "",
+        "price": 1000,
+        "data": json.dumps({
+            "fragrance_details": {"performance": ["strong", "long lasting"]},
+        }),
+    }
+    product_no_perf = {
+        "id": "241",
+        "name": "Plain",
+        "brand": "Test",
+        "category": "Men",
+        "description": "",
+        "price": 800,
+        "data": '{}',
+    }
+
+    assert _matches_performance(product, "strong") is True
+    assert _matches_performance(product, "longlasting") is True
+    assert _matches_performance(product_no_perf, "strong") is False

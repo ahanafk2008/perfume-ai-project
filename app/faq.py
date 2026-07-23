@@ -93,6 +93,43 @@ FAQS = {
             "Tell us your preferred scent style and we can help."
         ),
     },
+
+    "delivery_time": {
+        "keywords": [
+            "delivery time",
+            "delivery koto din",
+            "koto din",
+            "কত দিন লাগে",
+            "কত দিনে ডেলিভারি",
+            "কতদিনে",
+            "কবে পাবো",
+            "kobe pabo",
+            "shipping time",
+            "how many days",
+        ],
+        "answer": (
+            "Delivery typically takes 2-4 business days within Bangladesh. "
+            "For specific delivery timeframes, please contact Scent Of Time directly."
+        ),
+    },
+
+    "cod": {
+        "keywords": [
+            "cod",
+            "cash on delivery",
+            "cod ache",
+            "cod আছে",
+            "পেমেন্ট কি cod",
+            "cod ki",
+            "cash on delivery ki",
+            "cash on delivery ache",
+            "ক্যাশ অন ডেলিভারি",
+        ],
+        "answer": (
+            "Yes, Cash on Delivery (COD) is available. "
+            "Please confirm your order details with Scent Of Time for COD availability in your area."
+        ),
+    },
 }
 
 
