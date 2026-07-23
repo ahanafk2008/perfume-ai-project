@@ -9,3 +9,7 @@ class SearchService:
     def search(self, query: str):
         """Search for products."""
         return search_products(query)
+
+    def search_products(self, query: str = ""):
+        """Alias for search method for backward compatibility."""
+        return self.search(query)

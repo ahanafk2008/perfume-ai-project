@@ -1,15 +1,18 @@
-import ollama
+import pytest
 
-print("Connecting...")
 
-response = ollama.chat(
-    model="qwen3-coder:30b",
-    messages=[
-        {
-            "role": "user",
-            "content": "Say hello in one sentence."
-        }
-    ]
-)
+@pytest.mark.integration
+def test_ollama_connection():
+    import ollama
 
-print(response["message"]["content"])
+    response = ollama.chat(
+        model="qwen3-coder:30b",
+        messages=[
+            {
+                "role": "user",
+                "content": "Say hello in one sentence."
+            }
+        ],
+    )
+
+    assert "message" in response
