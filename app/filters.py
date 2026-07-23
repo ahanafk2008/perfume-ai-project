@@ -56,7 +56,9 @@ NORMALIZATION: dict[str, str] = {
     "boy": "male",
     "boys": "male",
     "chele": "male",
+    "cheleder": "male",
     "ছেলে": "male",
+    "ছেলেদের": "male",
     "পুরুষ": "male",
 
     # Unisex
@@ -466,6 +468,15 @@ def extract_budget(query: str) -> int | None:
 
     lower = normalize(query)
 
+    # "k" / "K" shorthand: 2k = 2000, 2.5k = 2500
+    # Check the RAW query (before normalize()) because normalize() strips
+    # the decimal point from "2.5k" turning it into "25k" -> 25000.
+    # This must be the FIRST check so "up to 1.5k", "under 2.5k" don't
+    # get captured by multi-word patterns as digits-only values.
+    match = re.search(r"(\d+(?:\.\d+)?)\s*k\b", query, re.IGNORECASE)
+    if match:
+        return int(float(match.group(1)) * 1000)
+
     match = re.search(r"৳\s*(\d+)", query)
     if match:
         return int(match.group(1))
@@ -480,6 +491,11 @@ def extract_budget(query: str) -> int | None:
         if match:
             return int(match.group(1))
 
+    # Bangla "হাজার" (hazar = thousand): "২ হাজার" = 2000
+    match = re.search(r"(\d+)\s*হাজার", lower)
+    if match:
+        return int(match.group(1)) * 1000
+
     for keyword in BUDGET_KEYWORDS:
         pattern = rf"\b{re.escape(keyword)}\s+(\d+)"
         match = re.search(pattern, lower)
@@ -491,6 +507,16 @@ def extract_budget(query: str) -> int | None:
         return int(match.group(1))
 
     match = re.search(r"(\d+)\s+টাকার\s+মধ্যে", lower)
+    if match:
+        return int(match.group(1))
+
+    # "cheaper than X" / "cheap under X"
+    match = re.search(r"(?:cheaper|cheap)\s+(?:than\s+)?(\d+)", lower)
+    if match:
+        return int(match.group(1))
+
+    # "my budget is X" / "budget is X"
+    match = re.search(r"(?:my\s+)?budget\s+is\s+(\d+)", lower)
     if match:
         return int(match.group(1))
 

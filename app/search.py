@@ -125,7 +125,7 @@ def search_products(
 
 
     # Ranking with intent information
-    return rank_products(
+    ranked = rank_products(
         candidates,
         query,
         tokens=tokens,
@@ -135,3 +135,17 @@ def search_products(
         category=category,
         combo_requested=combo_requested,
     )
+
+    # Post-ranking budget enforcement: budget extracted from query must be
+    # strictly respected regardless of ranking scores.  The database layer
+    # already filters candidates by budget, but ranking can receive unfiltered
+    # data from other callers; this guard ensures no over-budget product
+    # ever reaches the user.
+    if budget is not None:
+        ranked = [
+            product
+            for product in ranked
+            if float(product.get("price", 0)) <= budget
+        ]
+
+    return ranked

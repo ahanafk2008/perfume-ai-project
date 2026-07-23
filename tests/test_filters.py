@@ -172,3 +172,86 @@ def test_detect_category_not_gender():
     assert detect_category("female perfume") is None
     assert detect_category("unisex perfume") is None
 
+
+# -----------------------------
+# Regression: k shorthand budget (2k = 2000)
+# -----------------------------
+
+def test_extract_budget_k_shorthand():
+    """'2k' should be parsed as 2000."""
+    assert extract_budget("perfume within 2k") == 2000
+    assert extract_budget("perfume under 2k") == 2000
+    assert extract_budget("under 2k budget") == 2000
+
+
+def test_extract_budget_decimal_k_shorthand():
+    """'2.5k' should be parsed as 2500."""
+    assert extract_budget("perfume under 2.5k") == 2500
+    assert extract_budget("up to 1.5k") == 1500
+
+
+# -----------------------------
+# Regression: cheaper than pattern
+# -----------------------------
+
+def test_extract_budget_cheaper_than():
+    """'cheaper than X' should extract budget X."""
+    assert extract_budget("cheaper than 800") == 800
+    assert extract_budget("cheap than 500") == 500
+
+
+# -----------------------------
+# Regression: my budget is pattern
+# -----------------------------
+
+def test_extract_budget_my_budget_is():
+    """'my budget is X' should extract budget X."""
+    assert extract_budget("my budget is 2500") == 2500
+    assert extract_budget("budget is 3000") == 3000
+
+
+# -----------------------------
+# Regression: Bangla gender detection
+# -----------------------------
+
+def test_detect_gender_bangla():
+    """Bangla gender words should map correctly."""
+    assert detect_gender("ছেলেদের জন্য ভালো perfume") == "male"
+    assert detect_gender("মেয়েদের perfume দেখান") == "female"
+    assert detect_gender("cheleder jonno perfume") == "male"
+    assert detect_gender("meyeder best perfume") == "female"
+
+
+# -----------------------------
+# Regression: Budget enforcement (end-to-end)
+# -----------------------------
+
+def test_budget_enforcement_end_to_end():
+    """Products over budget should never be returned."""
+    from app.search import search_products
+    results = search_products("perfume under 2000")
+    for product in results:
+        assert float(product.get("price", 0)) <= 2000, (
+            f"Product {product.get('name')} costs {product.get('price')} "
+            f"which exceeds budget of 2000"
+        )
+
+
+# -----------------------------
+# Regression: Budget enforcement for custom amounts
+# -----------------------------
+
+def test_budget_enforcement_custom():
+    """Budget filtering must be strict at different thresholds."""
+    from app.search import search_products
+    for budget_str, max_price in [
+        ("under 1000", 1000),
+        ("under 5000", 5000),
+    ]:
+        results = search_products(f"perfume {budget_str}")
+        for product in results:
+            assert float(product.get("price", 0)) <= max_price, (
+                f"Product {product.get('name')} costs {product.get('price')} "
+                f"which exceeds {budget_str}"
+            )
+
