@@ -179,6 +179,40 @@ STOP_WORDS: set[str] = {
     "affordable",
     "value",
     "economy",
+    "sasto",
+    "sasta",
+    "komdami",
+
+    # Bangla stop words
+    "করে",
+    "করা",
+    "হবে",
+    "কোন",
+    "কোনো",
+    "একটি",
+    "একটা",
+    "এই",
+    "ওই",
+    "সেই",
+    "সেটা",
+    "এটা",
+    "ওটা",
+    "কে",
+    "কিভাবে",
+    "কেন",
+    "বলে",
+    "দিয়ে",
+    "থেকে",
+    "কাছে",
+    "বিষয়ে",
+    "আমি",
+    "আপনি",
+    "তুমি",
+    "সে",
+    "আমার",
+    "আপনার",
+    "তার",
+    "তোমার",
 }
 
 
@@ -409,8 +443,6 @@ COMBO_WORDS: set[str] = {
     # Banglish
     "combo lagbe",
     "set lagbe",
-    "gift set",
-    "giftset",
 
     # Bangla
     "কম্বো",
@@ -492,15 +524,25 @@ def extract_budget(query: str) -> int | None:
     if match:
         return int(float(match.group(1)) * 1000)
 
-    match = re.search(r"৳\s*(\d+)", query)
+    # ৳ symbol before or after number (raw query, since normalize keeps ৳)
+    match = re.search(r"[\u09f3]\s*(\d+)", query)
     if match:
         return int(match.group(1))
 
-    # Multi-word budget phrases
+    # Multi-word budget phrases (check raw query for ৳ between keyword and number)
     multi_word_patterns = [
-        r"less\s+than\s+(\d+)",
-        r"up\s+to\s+(\d+)",
+        r"less\s+than\s+[\u09f3]?\s*(\d+)",
+        r"up\s+to\s+[\u09f3]?\s*(\d+)",
+        r"cheaper\s+than\s+[\u09f3]?\s*(\d+)",
+        r"cheap\s+than\s+[\u09f3]?\s*(\d+)",
+        r"exactly\s+[\u09f3]?\s*(\d+)",
+        r"around\s+[\u09f3]?\s*(\d+)",
+        r"at\s+least\s+[\u09f3]?\s*(\d+)",
     ]
+    for pattern in multi_word_patterns:
+        match = re.search(pattern, query, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
     for pattern in multi_word_patterns:
         match = re.search(pattern, lower)
         if match:
@@ -512,7 +554,7 @@ def extract_budget(query: str) -> int | None:
         return int(match.group(1)) * 1000
 
     for keyword in BUDGET_KEYWORDS:
-        pattern = rf"\b{re.escape(keyword)}\s+(\d+)"
+        pattern = rf"\b{re.escape(keyword)}\s+[\u09f3]?\s*(\d+)"
         match = re.search(pattern, lower)
         if match:
             return int(match.group(1))
@@ -638,28 +680,36 @@ def detect_sort(query: str) -> str | None:
 
 
 def detect_occasion(query: str) -> str | None:
-    """Detect occasion keywords from query."""
+    """Detect occasion keywords from query.
+
+    Maps abstract occasions like university, gym, interview, etc.
+    to structured tags. Never returns None if close matches exist.
+    """
     occasion_keywords = {
-        "office": "office",
-        "work": "office",
-        "professional": "office",
-        "formal": "office",
-        "corporate": "office",
-        "office wear": "office",
-        "কাজ": "office",
-        "অফিস": "office",
+    "office": "office",
+    "work": "office",
+    "professional": "office",
+    "formal": "office",
+    "corporate": "office",
+    "office wear": "office",
+    "কাজ": "office",
+    "অফিস": "office",
+    "অফিসে": "office",
+    "অফিসের জন্য": "office",
+    "অফিসে ব্যবহার": "office",
+    "অফিস যাওয়ার": "office",
 
         "date": "date",
         "dating": "date",
         "romantic": "date",
         "dinner": "date",
         "night out": "date",
-        "night out": "date",
 
         "party": "party",
         "club": "party",
         "nightclub": "party",
         "event": "party",
+
         "wedding": "wedding",
         "marriage": "wedding",
         "reception": "wedding",
@@ -668,12 +718,50 @@ def detect_occasion(query: str) -> str | None:
         "biyer": "wedding",
         "biya": "wedding",
         "বিয়ে": "wedding",
+        "wedding guest": "wedding",
+        "shaadi": "wedding",
 
         "casual": "casual",
-        "everyday": "casual",
-        "daily": "casual",
-        "everyday wear": "casual",
-        "regular": "casual",
+        "everyday": "daily",
+        "daily": "daily",
+        "daily use": "daily",
+        "everyday wear": "daily",
+        "regular": "daily",
+        "daily wear": "daily",
+        "din din": "daily",
+
+        "university": "daily",
+        "college": "daily",
+        "class": "daily",
+        "student": "daily",
+        "school": "daily",
+        "বিশ্ববিদ্যালয়": "daily",
+        "কলেজ": "daily",
+
+        "gym": "sport",
+        "workout": "sport",
+        "fitness": "sport",
+        "exercise": "sport",
+        "sport": "sport",
+        "sports": "sport",
+        "জিম": "sport",
+        "ব্যায়াম": "sport",
+
+        "interview": "office",
+        "job interview": "office",
+        "চাকরির ইন্টারভিউ": "office",
+        "ইন্টারভিউ": "office",
+
+        "vacation": "casual",
+        "holiday": "casual",
+        "trip": "casual",
+        "travel": "casual",
+        "tour": "casual",
+        "traveling": "casual",
+        "ছুটি": "casual",
+        "ভ্রমণ": "casual",
+        "বেড়াতে": "casual",
+        "tour e": "casual",
 
         "eid": "eid",
         "ঈদ": "eid",
@@ -689,44 +777,48 @@ def detect_occasion(query: str) -> str | None:
 def detect_scent(query: str) -> str | None:
     """Detect scent preference keywords from query."""
     scent_keywords = {
-        "sweet": "sweet",
-        "sugary": "sweet",
-        "candy": "sweet",
-        "dessert": "sweet",
+    "sweet": "sweet",
+    "sugary": "sweet",
+    "candy": "sweet",
+    "dessert": "sweet",
+    "মিষ্টি": "sweet",
 
-        "fresh": "fresh",
-        "clean": "fresh",
-        "aqua": "fresh",
-        "aquatic": "fresh",
-        "marine": "fresh",
-        "ocean": "fresh",
+    "fresh": "fresh",
+    "clean": "fresh",
+    "aqua": "fresh",
+    "aquatic": "fresh",
+    "marine": "fresh",
+    "ocean": "fresh",
+    "ফ্রেশ": "fresh",
+    "তাজা": "fresh",
 
-        "woody": "woody",
-        "wood": "woody",
-        "forest": "woody",
-        "earthy": "woody",
+    "woody": "woody",
+    "wood": "woody",
+    "forest": "woody",
+    "earthy": "woody",
 
-        "oud": "oud",
-        "oudh": "oud",
-        "agar": "oud",
+    "oud": "oud",
+    "oudh": "oud",
+    "agar": "oud",
 
-        "spicy": "spicy",
-        "pepper": "spicy",
-        "ginger": "spicy",
-        "hot": "spicy",
+    "spicy": "spicy",
+    "pepper": "spicy",
+    "ginger": "spicy",
+    "hot": "spicy",
 
-        "vanilla": "vanilla",
+    "vanilla": "vanilla",
+    "ভ্যানিলা": "vanilla",
 
-        "floral": "floral",
-        "flower": "floral",
-        "flowers": "floral",
-        "rose": "floral",
-        "jasmine": "floral",
-        "jasmin": "floral",
-        "lavender": "floral",
-        "peony": "floral",
-        "tuberose": "floral",
-    }
+    "floral": "floral",
+    "flower": "floral",
+    "flowers": "floral",
+    "rose": "floral",
+    "jasmine": "floral",
+    "jasmin": "floral",
+    "lavender": "floral",
+    "peony": "floral",
+    "tuberose": "floral",
+}
 
     q = normalize(query)
     for keyword, scent in scent_keywords.items():
@@ -747,6 +839,11 @@ def detect_performance(query: str) -> str | None:
         "lasts long": "longlasting",
         "long time": "longlasting",
         "hours": "longlasting",
+        "বেশিক্ষণ": "longlasting",
+        "বেশিক্ষণ থাকে": "longlasting",
+        "সারাদিন": "longlasting",
+        "সারাদিন থাকে": "longlasting",
+        "ঘন্টার পর ঘন্টা": "longlasting",
 
         "strong": "strong",
         "powerful": "strong",
@@ -759,6 +856,7 @@ def detect_performance(query: str) -> str | None:
         "sillage": "projection",
         "spreads": "projection",
         "fill room": "projection",
+        "প্রজেকশন": "projection",
 
         "compliment": "compliment",
         "compliments": "compliment",
@@ -906,6 +1004,29 @@ def detect_gift(query: str) -> bool:
     return False
 
 
+VAGUE_BUDGET_PHRASES: set[str] = {
+    "budget kom",
+    "budget beshi na",
+    "kom budget",
+    "low budget",
+    "sasto",
+    "sasta",
+    "kom dam",
+    "komdami",
+    "budget e",
+    "bekar",
+}
+
+
+def detect_vague_budget(query: str) -> bool:
+    """Detect vague budget intent like 'budget kom', 'sasto', etc."""
+    q = query.lower().strip()
+    for phrase in VAGUE_BUDGET_PHRASES:
+        if phrase in q:
+            return True
+    return False
+
+
 def detect_cheap_intent(query: str) -> bool:
     """Detect cheap/budget/affordable intent without a specific price."""
     q = normalize(query)
@@ -948,13 +1069,17 @@ SEASON_WORDS: dict[str, str] = {
     "chilly": "winter",
     "fall": "winter",
     "autumn": "winter",
-    "rainy": "winter",
-    "monsoon": "winter",
+    "rainy": "summer",
+    "monsoon": "summer",
     "গ্রীষ্ম": "summer",
     "গরম": "summer",
+    "গরম কাল": "summer",
     "শীত": "winter",
     "ঠান্ডা": "winter",
+    "শীত কাল": "winter",
     "বর্ষা": "winter",
+    "গরমে": "summer",
+    "শীতে": "winter",
 }
 
 
@@ -965,6 +1090,196 @@ def detect_season(query: str) -> str | None:
         if keyword in q:
             return season
     return None
+
+
+# =============================================================================
+# Nuanced Request Mapping
+# Maps abstract/ nuanced requests to weighted attribute preferences.
+# =============================================================================
+
+class NuancedRequest:
+    """Represents a parsed nuanced request with weighted preferences."""
+
+    def __init__(
+        self,
+        *,
+        sweetness: float = 0.0,
+        freshness: float = 0.0,
+        masculinity: float = 0.0,
+        elegance: float = 0.0,
+        luxury_level: float = 0.0,
+        versatility: float = 0.0,
+        compliment_factor: float = 0.0,
+        mass_appeal: float = 0.0,
+        citrus: float = 0.0,
+        gourmand: float = 0.0,
+        aquatic: float = 0.0,
+        woody: float = 0.0,
+        floral: float = 0.0,
+        spicy: float = 0.0,
+        price_perception: str | None = None,
+    ):
+        self.sweetness = sweetness
+        self.freshness = freshness
+        self.masculinity = masculinity
+        self.elegance = elegance
+        self.luxury_level = luxury_level
+        self.versatility = versatility
+        self.compliment_factor = compliment_factor
+        self.mass_appeal = mass_appeal
+        self.citrus = citrus
+        self.gourmand = gourmand
+        self.aquatic = aquatic
+        self.woody = woody
+        self.floral = floral
+        self.spicy = spicy
+        self.price_perception = price_perception
+
+    def is_empty(self) -> bool:
+        return all(
+            getattr(self, attr) == 0.0 or getattr(self, attr) is None
+            for attr in [
+                "sweetness", "freshness", "masculinity", "elegance",
+                "luxury_level", "versatility", "compliment_factor", "mass_appeal",
+                "citrus", "gourmand", "aquatic", "woody", "floral", "spicy",
+                "price_perception",
+            ]
+        )
+
+    def to_prompt_hint(self) -> str:
+        hints = []
+        if self.sweetness > 0.5:
+            hints.append("sweet")
+        elif self.sweetness > 0 and self.sweetness <= 0.5:
+            hints.append("lightly sweet (not cloying)")
+        if self.freshness > 0.5:
+            hints.append("fresh")
+        elif self.freshness > 0 and self.freshness <= 0.5:
+            hints.append("subtle freshness")
+        if self.citrus > 0.5:
+            hints.append("citrus")
+        elif self.citrus > 0 and self.citrus <= 0.3:
+            hints.append("low citrus")
+        if self.masculinity > 0.5:
+            hints.append("masculine leaning")
+        elif self.masculinity > 0 and self.masculinity <= 0.5:
+            hints.append("lightly masculine")
+        if self.elegance > 0.5:
+            hints.append("elegant")
+        if self.luxury_level > 0.5:
+            hints.append("luxury/expensive smelling")
+        if self.versatility > 0.5:
+            hints.append("versatile")
+        if self.compliment_factor > 0.5:
+            hints.append("compliment-getting")
+        if self.mass_appeal > 0.5:
+            hints.append("mass-appealing")
+        if self.price_perception == "expensive":
+            hints.append("smells expensive")
+        if self.gourmand > 0.5:
+            hints.append("gourmand")
+        if self.aquatic > 0.5:
+            hints.append("aquatic")
+        if self.woody > 0.5:
+            hints.append("woody")
+        if self.floral > 0.5:
+            hints.append("floral")
+        if self.spicy > 0.5:
+            hints.append("spicy")
+        return ", ".join(hints) if hints else "standard"
+
+
+def parse_nuanced_request(query: str) -> NuancedRequest:
+    """Parse a nuanced request into weighted attribute preferences.
+
+    Handles patterns like:
+    - "sweet but not too sweet" -> sweetness=0.6
+    - "fresh but not citrus" -> freshness=0.8, citrus=0.2
+    - "masculine but not too masculine" -> masculinity=0.5
+    - "expensive smelling" -> price_perception="expensive"
+    - "compliment getter" -> compliment_factor=1.0
+    - "elegant" -> elegance=1.0
+    - "luxury" -> luxury_level=1.0
+    - "versatile" -> versatility=1.0
+    """
+    q = query.lower().strip()
+    nr = NuancedRequest()
+
+    # Price perception
+    if re.search(r"expensive.?smelling|looks? expensive|feels? expensive|premium quality", q):
+        nr.price_perception = "expensive"
+        nr.luxury_level = max(nr.luxury_level, 0.8)
+
+    # Sweetness: "sweet but not too sweet"
+    if "sweet" in q:
+        if re.search(r"not too sweet|not very sweet|subtle sweet|lightly sweet|not sickly", q):
+            nr.sweetness = 0.5
+        elif re.search(r"very sweet|extremely sweet|super sweet|sugary|candy.?like", q):
+            nr.sweetness = 1.0
+        else:
+            nr.sweetness = 0.8
+
+    # Freshness (check negation BEFORE citrus check)
+    has_citrus_negation = bool(re.search(r"not.*citrus|without citrus|no citrus|non.?citrus", q))
+    if "fresh" in q or "refreshing" in q:
+        if has_citrus_negation:
+            nr.freshness = 0.8
+            nr.citrus = 0.2
+        else:
+            nr.freshness = 0.8
+
+    # Citrus (only if not negated)
+    if not has_citrus_negation and re.search(r"citrus|lemony|orange|bergamot|grapefruit", q):
+        nr.citrus = max(nr.citrus, 0.8)
+
+    # Masculinity
+    if re.search(r"masculine|manly|mardana|পুরুষোচিত", q):
+        if re.search(r"not too masculine|not too manly|subtle|lightly|soft", q):
+            nr.masculinity = 0.5
+        else:
+            nr.masculinity = 1.0
+
+    # Compliment getter
+    if re.search(r"compliment.?getter|compliment.?getting|get compliments|turn heads|people notice", q):
+        nr.compliment_factor = 1.0
+
+    # Elegance
+    if re.search(r"elegant|classy|sophisticated|refined|graceful", q):
+        nr.elegance = 1.0
+
+    # Luxury
+    if re.search(r"luxury|luxurious|premium|high.?end|designer", q):
+        nr.luxury_level = max(nr.luxury_level, 1.0)
+
+    # Versatility
+    if re.search(r"versatile|all.?rounder|any occasion|day.?to.?night|multipurpose", q):
+        nr.versatility = 1.0
+
+    # Mass appeal
+    if re.search(r"mass.?appeal|crowd.?pleaser|everyone.?like|universal|safe.?buy", q):
+        nr.mass_appeal = 1.0
+
+    # Gourmand
+    if re.search(r"gourmand|edible|dessert|chocolate|caramel|vanilla|honey|coffee", q):
+        nr.gourmand = max(nr.gourmand, 0.8)
+
+    # Aquatic
+    if re.search(r"aquatic|marine|ocean|sea|salt|water", q):
+        nr.aquatic = max(nr.aquatic, 0.8)
+
+    # Woody
+    if re.search(r"woody|wood|cedar|sandalwood|vetiver|oakmoss", q):
+        nr.woody = max(nr.woody, 0.8)
+
+    # Floral
+    if re.search(r"floral|flower|rose|jasmine|lavender|bloom", q):
+        nr.floral = max(nr.floral, 0.8)
+
+    # Spicy
+    if re.search(r"spicy|pepper|cinnamon|clove|cardamom|warm", q):
+        nr.spicy = max(nr.spicy, 0.8)
+
+    return nr
 
 
 def extract_structured_filters(query: str) -> dict[str, Any]:
@@ -979,6 +1294,8 @@ def extract_structured_filters(query: str) -> dict[str, Any]:
         "luxury": detect_luxury(query),
         "gift": detect_gift(query),
         "cheap_intent": detect_cheap_intent(query),
+        "vague_budget": detect_vague_budget(query),
         "compliment": detect_compliment(query),
         "sort": detect_sort(query),
+        "nuanced": parse_nuanced_request(query),
     }

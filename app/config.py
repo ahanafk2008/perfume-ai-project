@@ -9,7 +9,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 # Load environment variables
 load_dotenv()
 
@@ -91,7 +90,7 @@ TARGET_PROMPT_MIN: int = 1500
 
 TARGET_PROMPT_MAX: int = 2500
 
-PROMPT_HARD_LIMIT: int = 8000
+PROMPT_HARD_LIMIT: int = 9000
 
 
 # =========================

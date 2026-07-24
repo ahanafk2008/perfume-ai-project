@@ -1,10 +1,13 @@
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, patch
+
+from app.repositories.product_repository import ProductRepository
+from app.services.ai import AIService
 from app.services.chat import ChatService
 from app.services.intent import IntentService
 from app.services.search import SearchService
-from app.services.ai import AIService
-from app.repositories.product_repository import ProductRepository
+
 
 # Mock product repository
 @pytest.fixture

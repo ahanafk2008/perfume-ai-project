@@ -1,6 +1,35 @@
 """Conversation response service."""
 
+import re
+
 from app.intent import Intent
+
+# Reference pronouns that resolve to the last discussed product
+_REFERENCE_PATTERNS = {
+    "eta",
+    "eitar",
+    "oita",
+    "oi ta",
+    "ei ta",
+    "ei tao",
+    "eituku",
+    "amar perfume",
+    "last perfume",
+    "previous perfume",
+    "this",
+    "that",
+    "it",
+    "this perfume",
+    "that perfume",
+    "the perfume",
+    "eta perfume",
+    "oita perfume",
+    "seta",
+    "shei ta",
+    "shei perfume",
+    "agor ta",
+    "agor perfume",
+}
 
 
 class ConversationService:
@@ -11,6 +40,8 @@ class ConversationService:
         self.last_product_name: str | None = None
         self.last_search_products: list[dict] = []
         self.last_filters: dict = {}
+        self._product_history: list[dict] = []
+        self._product_history_names: list[str] = []
 
     def handle(self, intent: Intent) -> str | None:
         """Return response if this intent is handled here."""
@@ -27,6 +58,31 @@ class ConversationService:
                 "• Compare fragrances\n"
                 "• Answer product questions\n\n"
                 "How can I help you today?"
+            )
+
+        if intent == Intent.BEGINNER:
+            return (
+                "\nAI:\n"
+                "No problem! Let me guide you through the basics.\n\n"
+                "Perfumes generally fall into these scent families:\n"
+                "• Fresh — clean, citrus, aquatic (great for summer/office)\n"
+                "• Sweet/Gourmand — vanilla, caramel, dessert-like\n"
+                "• Woody — cedar, sandalwood, vetiver (warm, earthy)\n"
+                "• Floral — rose, jasmine, lavender (romantic, elegant)\n"
+                "• Oriental/Spicy — amber, spices, incense (warm, rich)\n\n"
+                "Tell me what sounds interesting to you, or your budget, "
+                "and I'll recommend something perfect for a beginner!"
+            )
+
+        if intent == Intent.COLLECTION_BUILDER:
+            return (
+                "\nAI:\n"
+                "I'll help you build a balanced collection covering different occasions! 😊\n\n"
+                "Tell me:\n"
+                "• Your budget range\n"
+                "• How many perfumes you want\n"
+                "• Any scent preferences\n\n"
+                "I'll make sure each one serves a different purpose."
             )
 
         if intent == Intent.THANKS:
@@ -85,16 +141,46 @@ class ConversationService:
         return None
 
     def store_product_context(self, products: list[dict], query: str = ""):
-        """Store the last searched products and extract single product if available."""
+        """Store the last searched products and build product history."""
         if products:
             self.last_search_products = products
-            # Store the first/most relevant product as the primary context
             self.last_product = products[0] if products else None
             self.last_product_name = self.last_product.get("name") if self.last_product else None
+
+            for p in products:
+                name = p.get("name") or ""
+                if name and name not in self._product_history_names:
+                    self._product_history_names.append(name)
+                    self._product_history.append(p)
+
+            self._product_history = self._product_history[-5:]
+            self._product_history_names = self._product_history_names[-5:]
         else:
             self.last_search_products = []
             self.last_product = None
             self.last_product_name = None
+
+    def resolve_referenced_product(self, query: str) -> dict | None:
+        """Resolve a pronoun reference like 'eta', 'oita', 'this', 'that' to the actual product."""
+        if not self._product_history:
+            return None
+        q = query.lower().strip()
+        q_clean = re.sub(r"[?।!,]", "", q).strip()
+        words = set(q_clean.split())
+
+        if words & _REFERENCE_PATTERNS:
+            return self._product_history[-1]
+
+        for phrase in sorted(_REFERENCE_PATTERNS, key=len, reverse=True):
+            if " " in phrase and phrase in q_clean:
+                return self._product_history[-1]
+
+        return None
+
+    def resolve_referenced_product_name(self, query: str) -> str | None:
+        """Resolve reference and return the product name."""
+        prod = self.resolve_referenced_product(query)
+        return prod.get("name") if prod else None
 
     def get_last_product(self) -> dict | None:
         """Get the last mentioned product."""
@@ -108,9 +194,15 @@ class ConversationService:
         """Get all products from the last search."""
         return self.last_search_products
 
+    def get_product_history(self) -> list[dict]:
+        """Get the list of last 5 discussed products."""
+        return list(self._product_history)
+
     def clear_product_context(self):
         """Clear stored product context."""
         self.last_product = None
         self.last_product_name = None
         self.last_search_products = []
         self.last_filters = {}
+        self._product_history = []
+        self._product_history_names = []

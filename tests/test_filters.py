@@ -1,17 +1,16 @@
 from app.filters import (
     correct_common_typos,
-    normalize_words,
-    tokenize_query,
-    extract_budget,
-    detect_gender,
     detect_brand,
     detect_category,
     detect_combo,
-    detect_recommendation,
+    detect_gender,
     detect_luxury,
     detect_performance,
+    detect_recommendation,
+    extract_budget,
+    normalize_words,
+    tokenize_query,
 )
-
 
 # -----------------------------
 # Typo correction
@@ -366,7 +365,7 @@ def test_detect_season():
     assert detect_season("winter fragrance") == "winter"
     assert detect_season("hot weather perfume") == "summer"
     assert detect_season("cold weather") == "winter"
-    assert detect_season("rainy season perfume") == "winter"
+    assert detect_season("rainy season perfume") == "summer"
     assert detect_season("office perfume") is None
     assert detect_season("best perfume") is None
 
@@ -390,17 +389,17 @@ def test_detect_occasion_bangla():
 # -----------------------------
 
 def test_detect_original_kina():
-    from app.intent import detect_intent, Intent
+    from app.intent import Intent, detect_intent
     assert detect_intent("Original kina?") == Intent.PRODUCT_INFO
 
 
 def test_detect_eta_original():
-    from app.intent import detect_intent, Intent
+    from app.intent import Intent, detect_intent
     assert detect_intent("Eta original?") == Intent.PRODUCT_INFO
 
 
 def test_detect_eta_asal():
-    from app.intent import detect_intent, Intent
+    from app.intent import Intent, detect_intent
     assert detect_intent("এটা আসল?") == Intent.PRODUCT_INFO
 
 

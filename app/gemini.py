@@ -6,7 +6,6 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-
 from prompts import SYSTEM_PROMPT
 
 load_dotenv()
@@ -69,7 +68,7 @@ Available products:
                 ),
             )
             return response.text.strip()
-        except Exception as e:
+        except (ValueError, TypeError, RuntimeError) as e:
             logger.warning("Gemini model %s failed: %s", model_name, e)
             last_error = e
 

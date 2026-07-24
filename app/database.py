@@ -1,8 +1,8 @@
 """SQLite database helpers."""
 
-from collections.abc import Mapping, Sequence
 import logging
 import sqlite3
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -188,6 +188,10 @@ def fetch_product_candidates(
         "show",
         "list",
         "all",
+        "but",
+        "very",
+        # Note: premium, luxury, signature, popular, best, top, cheap, budget,
+        # etc. are handled by the ranking layer, not database STOP_WORDS.
         # Attribute/performance words — these describe desired qualities but
         # rarely appear in product data; they should not restrict DB search.
         "long",
@@ -197,11 +201,8 @@ def fetch_product_candidates(
         "intense",
         "projection",
         "beast",
-        "but",
-        "very",
         # Recommendation/descriptive words — they describe product quality but
-        # should not restrict the database search to only products whose
-        # descriptions coincidentally contain these words.
+        # should not restrict the database search.
         "premium",
         "luxury",
         "signature",
@@ -218,7 +219,7 @@ def fetch_product_candidates(
         "economy",
         "reasonable",
         "discount",
-        # Occasion/scent/season words — they describe use-cases but rarely appear
+        # Occasion words — they describe use-cases but rarely appear
         # in product data; they should not restrict the database search.
         "office",
         "professional",
@@ -242,12 +243,6 @@ def fetch_product_candidates(
         "compliment",
         "compliments",
         "attention",
-        "sweet",
-        "fresh",
-        "woody",
-        "spicy",
-        "floral",
-        "vanilla",
         "summer",
         "winter",
         "spring",
@@ -260,6 +255,9 @@ def fetch_product_candidates(
         "warm",
         "sunny",
         "night",
+        # Note: scent/note words (sweet, fresh, woody, spicy, floral, vanilla,
+        # etc.) are intentionally NOT in STOP_WORDS because they do appear in
+        # product descriptions and help filter the DB search.
     }
 
     # Remove stop words.
@@ -346,8 +344,8 @@ def fetch_product_candidates(
         }
         db_gender = gender_category_map.get(gender)
         if db_gender:
-            where_clauses.append("LOWER(category) = ?")
-            params.append(db_gender)
+            where_clauses.append("LOWER(category) LIKE ?")
+            params.append(f"%{db_gender}%")
 
     if combo_requested:
         where_clauses.append(

@@ -1,4 +1,5 @@
-import sqlite3, json
+import json
+import sqlite3
 
 conn = sqlite3.connect('data/products.db')
 

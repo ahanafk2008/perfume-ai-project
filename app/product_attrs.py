@@ -21,6 +21,8 @@ def _get_data(product: dict[str, Any]) -> dict[str, Any]:
 def extract_fragrance_details(product: dict[str, Any]) -> dict[str, Any]:
     """Extract fragrance_details sub-object from product data JSON."""
     data = _get_data(product)
+    if not data:
+        return {}
     return data.get("fragrance_details") or {}
 
 
@@ -39,6 +41,9 @@ def get_product_attributes(product: dict[str, Any]) -> dict[str, Any]:
         "scent_family": fd.get("scent_family") or None,
         "occasion": fd.get("occasion") or None,
         "performance": fd.get("performance") or None,
+        "authenticity": fd.get("authenticity") or None,
+        "product_origin": fd.get("product_origin") or None,
+        "strength": fd.get("strength") or None,
     }
 
 
@@ -93,6 +98,10 @@ def format_product_attributes(product: dict[str, Any]) -> str | None:
     pf = fd.get("performance")
     if pf and isinstance(pf, list) and pf:
         parts.append(f"Performance: {', '.join(pf)}")
+
+    auth = fd.get("authenticity")
+    if auth and isinstance(auth, str) and auth.strip():
+        parts.append(f"Authenticity: {auth.strip()}")
 
     notes_str = _format_notes(product)
     if notes_str:

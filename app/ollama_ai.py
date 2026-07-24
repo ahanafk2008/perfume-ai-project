@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_USER_ID = "cli"
 
+# Track detected language per user to maintain consistency across turns
+_user_language: dict[str, str] = {}
+
 FALLBACK_MESSAGE = (
     "Sorry, I am having trouble processing your request right now. "
     "Please try again in a moment."
@@ -54,6 +57,19 @@ def ask_ai(
     try:
         language = detect_language(question)
 
+        # Preserve detected language across turns for consistency.
+        # Only update when the new message has enough content to detect.
+        prev_lang = _user_language.get(user_id)
+        if language == "en" and prev_lang and prev_lang != "en":
+            # If user was speaking Bangla/Banglish and sends a short English
+            # query like "price?" or "notes?" (follow-up), keep the previous
+            # language so the assistant responds in the same language.
+            word_count = len(question.strip().split())
+            if word_count <= 4:
+                language = prev_lang
+        if prev_lang != language and (language != prev_lang and len(question.strip().split()) > 3 or not prev_lang):
+                _user_language[user_id] = language
+
         logger.debug(
             "Building prompt | user=%s | language=%s",
             user_id,
@@ -66,6 +82,7 @@ def ask_ai(
             searched=searched,
             history=conversation.get_history(user_id),
             language=language,
+            user_id=user_id,
         )
 
     except Exception:

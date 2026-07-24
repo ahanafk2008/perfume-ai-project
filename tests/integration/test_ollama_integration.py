@@ -1,5 +1,6 @@
-import pytest
 import os
+
+import pytest
 
 # This is an integration test that requires Ollama server to be running
 # It should only be run manually when Ollama is available
@@ -18,12 +19,9 @@ def test_ollama_integration():
     assert ai is not None
     
     # Test basic functionality - this will fail if Ollama server isn't running
-    try:
-        response = ai.generate_response("Hello", "What is your name?")
-        assert response is not None
-        print(f"Ollama response: {response}")
-    except Exception as e:
-        pytest.fail(f"Failed to get response from Ollama: {e}")
+    response = ai.generate_response("Hello", "What is your name?")
+    assert response is not None
+    print(f"Ollama response: {response}")
 
 @pytest.mark.integration  
 @pytest.mark.skipif(

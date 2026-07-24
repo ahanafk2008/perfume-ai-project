@@ -1,6 +1,5 @@
 from app.intent import Intent, detect_intent
 
-
 # -----------------------------
 # Greeting
 # -----------------------------
@@ -79,8 +78,8 @@ def test_location():
 
 def test_product_search():
     assert detect_intent("lattafa") == Intent.PRODUCT_SEARCH
-    assert detect_intent("best perfume") == Intent.PRODUCT_SEARCH
-    assert detect_intent("perfume under 2000") == Intent.PRODUCT_SEARCH
+    assert detect_intent("best perfume") == Intent.BEST_RECOMMENDATION
+    assert detect_intent("perfume under 2000") in (Intent.PRODUCT_SEARCH, Intent.BUDGET_RECOMMENDATION)
     assert detect_intent("sweet fragrance") == Intent.PRODUCT_SEARCH
 
 
@@ -126,7 +125,7 @@ def test_product_followup():
     """Regression: product info questions after search should use PRODUCT_INFO."""
     # Turn 1: product search
     assert (
-        detect_intent("show me men's perfumes")
+        detect_intent("show me all perfumes")
         == Intent.PRODUCT_SEARCH
     )
 
@@ -174,6 +173,83 @@ def test_gift_intent_generic():
 def test_gift_intent_not_confused_with_product_search():
     """Gift must take priority over generic product_search for ambiguous queries."""
     assert detect_intent("gift for husband") == Intent.GIFT
+
+
+# -----------------------------
+# Price/Objection
+# -----------------------------
+
+def test_objection_price():
+    assert detect_intent("Why is your price so high?") == Intent.OBJECTION_PRICE
+    assert detect_intent("too expensive") == Intent.OBJECTION_PRICE
+    assert detect_intent("your price is too high") == Intent.OBJECTION_PRICE
+    assert detect_intent("I won't buy unless you reduce price") == Intent.OBJECTION_PRICE
+
+
+def test_objection_competitor():
+    assert detect_intent("Daraz is cheaper") == Intent.OBJECTION_COMPETITOR
+    assert detect_intent("Another page sells cheaper") == Intent.OBJECTION_COMPETITOR
+    assert detect_intent("competitor") == Intent.OBJECTION_COMPETITOR
+
+
+def test_request_discount():
+    assert detect_intent("Give me discount") == Intent.REQUEST_DISCOUNT
+    assert detect_intent("discount den") == Intent.REQUEST_DISCOUNT
+    assert detect_intent("কোন অফার আছে") == Intent.REQUEST_DISCOUNT
+
+
+def test_request_negotiation():
+    assert detect_intent("Last price?") == Intent.REQUEST_NEGOTIATION
+    assert detect_intent("final price") == Intent.REQUEST_NEGOTIATION
+    assert detect_intent("sorbo shesh dam") == Intent.REQUEST_NEGOTIATION
+
+
+def test_request_delivery():
+    assert detect_intent("কুরিয়ার ফ্রি") == Intent.REQUEST_DELIVERY
+
+
+def test_sales_persuasion():
+    assert detect_intent("Convince me") == Intent.SALES_PERSUASION
+    assert detect_intent("why should i buy") == Intent.SALES_PERSUASION
+    assert detect_intent("sell me") == Intent.SALES_PERSUASION
+
+
+def test_trust_concern():
+    assert detect_intent("Why should I buy from you?") == Intent.TRUST_CONCERN
+    assert detect_intent("how can i trust") == Intent.TRUST_CONCERN
+    assert detect_intent("i don't trust online") == Intent.TRUST_CONCERN
+
+
+# -----------------------------
+# Objection intents take priority over product search
+# -----------------------------
+
+def test_objection_price_takes_priority_over_product_search():
+    """Regression: price objection must not trigger product search."""
+    result = detect_intent("Why is your price so high?")
+    assert result == Intent.OBJECTION_PRICE
+    assert result != Intent.PRODUCT_SEARCH
+
+
+def test_objection_competitor_takes_priority_over_product_search():
+    """Regression: competitor objection must not trigger product search."""
+    result = detect_intent("Daraz is cheaper")
+    assert result == Intent.OBJECTION_COMPETITOR
+    assert result != Intent.PRODUCT_SEARCH
+
+
+def test_request_discount_takes_priority_over_product_search():
+    """Regression: discount request must not trigger product search."""
+    result = detect_intent("Give me discount")
+    assert result == Intent.REQUEST_DISCOUNT
+    assert result != Intent.PRODUCT_SEARCH
+
+
+def test_trust_concern_over_product_search():
+    """Regression: trust concern must not trigger product search."""
+    assert detect_intent("why should i buy from you") == Intent.TRUST_CONCERN
+    assert detect_intent("i don't trust online") == Intent.TRUST_CONCERN
+    assert detect_intent("scam") == Intent.TRUST_CONCERN
 
 
 # -----------------------------

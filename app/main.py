@@ -2,7 +2,6 @@ import logging
 
 from .services.chat import ChatService
 
-
 logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",

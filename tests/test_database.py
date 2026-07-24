@@ -1,11 +1,11 @@
 from pathlib import Path
 
 from app.database import (
-    init_db,
     execute_write,
-    fetch_products,
     fetch_product_by_id,
     fetch_product_candidates,
+    fetch_products,
+    init_db,
 )
 
 

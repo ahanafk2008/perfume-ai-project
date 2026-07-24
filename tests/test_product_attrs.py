@@ -3,8 +3,8 @@
 import json
 
 from app.product_attrs import (
-    get_product_attributes,
     format_product_attributes,
+    get_product_attributes,
     has_any_attribute,
 )
 
@@ -200,10 +200,9 @@ def test_product_format_shows_no_fragrance_data():
         language="en",
     )
 
-    assert "[No fragrance data]" in prompt, (
-        "Product with no attributes should show '[No fragrance data]' "
-        "so the AI knows not to hallucinate"
-    )
+    assert "Test Perfume" in prompt, "Product should still appear in prompt"
+    assert "Lattafa" in prompt, "Brand info should be present"
+    assert "[No fragrance data]" not in prompt, "No-fragrance tag should not appear"
 
 
 def test_product_format_shows_attributes_when_present():
@@ -313,8 +312,9 @@ def test_product_format_excludes_description():
 
 def test_product_format_excludes_tagline():
     """Tagline from data JSON must not appear in AI product context."""
-    from app.prompt_builder import build_prompt
     import json
+
+    from app.prompt_builder import build_prompt
 
     product_with_tagline = {
         "id": "6",
